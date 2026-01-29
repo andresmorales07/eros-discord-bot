@@ -95,7 +95,9 @@ $RECYCLE.BIN/
 .DS_Store
 
 # Application specific
+appsettings.json
 appsettings.Development.json
 appsettings.Local.json
 *.env
 .env
+nul

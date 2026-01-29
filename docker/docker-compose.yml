@@ -1,0 +1,19 @@
+services:
+  erostts:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: erostts-bot
+    restart: unless-stopped
+    environment:
+      - DOTNET_ENVIRONMENT=Production
+      - EROSTTS_Discord__Token=${DISCORD_TOKEN}
+      - EROSTTS_ElevenLabs__ApiKey=${ELEVENLABS_API_KEY}
+      - EROSTTS_ElevenLabs__VoiceId=${ELEVENLABS_VOICE_ID:-21m00Tcm4TlvDq8ikWAM}
+    volumes:
+      - ../logs:/app/logs
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
