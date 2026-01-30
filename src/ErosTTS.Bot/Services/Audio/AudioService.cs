@@ -230,6 +230,10 @@ public sealed class AudioService : IAudioService, IAsyncDisposable
         {
             try
             {
+                // Send voice state update to Discord to leave the channel
+                await _gatewayClient.UpdateVoiceStateAsync(new VoiceStateProperties(guildId, null));
+
+                // Close the local voice client
                 await client.CloseAsync();
                 _logger.LogInformation("Disconnected from voice in guild {GuildId}", guildId);
             }
@@ -253,6 +257,9 @@ public sealed class AudioService : IAudioService, IAsyncDisposable
         {
             try
             {
+                // Send voice state update to Discord to leave the channel
+                await _gatewayClient.UpdateVoiceStateAsync(new VoiceStateProperties(guildId, null));
+
                 await client.CloseAsync();
                 _logger.LogDebug("Disconnected from guild {GuildId}", guildId);
             }
