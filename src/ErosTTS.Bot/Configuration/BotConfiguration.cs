@@ -31,4 +31,10 @@ public sealed class BotConfiguration
     /// Whether to process messages from other bots.
     /// </summary>
     public bool ProcessBotMessages { get; init; } = false;
+
+    /// <summary>
+    /// Whether to enable text channel monitoring mode (legacy behavior).
+    /// When false, only slash commands trigger TTS.
+    /// </summary>
+    public bool EnableTextChannelMonitoring { get; init; } = false;
 }

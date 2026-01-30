@@ -1,14 +1,14 @@
 # ErosTTS Discord Bot
 
-A Discord bot that converts text messages to speech using the Eleven Labs API and plays them in voice channels.
+A Discord bot that converts text to speech using the Eleven Labs API and plays it in Discord voice channels.
 
 ## Features
 
-- Monitors specified text channels for messages
-- Converts messages to speech using Eleven Labs TTS API
-- Plays audio in designated voice channels
+- **Slash command TTS** - Use `/say` to speak text in voice channels
+- Converts text to speech using Eleven Labs TTS API
+- Automatic voice channel detection (joins your current voice channel)
 - Message queue system for ordered, conflict-free playback
-- Slash commands for configuration
+- Optional text channel monitoring mode (legacy behavior)
 - Docker support for easy deployment
 - Comprehensive logging with Serilog
 
@@ -16,6 +16,7 @@ A Discord bot that converts text messages to speech using the Eleven Labs API an
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download) (for local development)
 - [FFmpeg](https://ffmpeg.org/download.html) (for audio processing)
+- [Opus codec](https://opus-codec.org/) (included via NuGet package)
 - A [Discord Bot Token](https://discord.com/developers/applications)
 - An [Eleven Labs API Key](https://elevenlabs.io/)
 
@@ -24,8 +25,9 @@ A Discord bot that converts text messages to speech using the Eleven Labs API an
 1. Go to the [Discord Developer Portal](https://discord.com/developers/applications)
 2. Create a new application
 3. Go to the "Bot" section and create a bot
-4. Enable the following Privileged Gateway Intents:
-   - **Message Content Intent** (required for reading messages)
+4. **Privileged Gateway Intents** (only needed if using text channel monitoring mode):
+   - **Message Content Intent** - Only required if `EnableTextChannelMonitoring` is set to `true`
+   - For slash-command-only mode, no privileged intents are needed
 5. Copy the bot token for configuration
 6. Go to OAuth2 > URL Generator and select:
    - Scopes: `bot`, `applications.commands`
@@ -50,7 +52,8 @@ A Discord bot that converts text messages to speech using the Eleven Labs API an
   "Discord": {
     "Token": "your_token_here",
     "MaxMessageLength": 500,
-    "ProcessBotMessages": false
+    "ProcessBotMessages": false,
+    "EnableTextChannelMonitoring": false
   },
   "ElevenLabs": {
     "ApiKey": "your_api_key_here",
@@ -68,6 +71,15 @@ A Discord bot that converts text messages to speech using the Eleven Labs API an
   }
 }
 ```
+
+### Configuration Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `Discord:EnableTextChannelMonitoring` | Enable legacy text channel monitoring mode | `false` |
+| `Discord:MaxMessageLength` | Maximum characters for TTS | `500` |
+| `Discord:ProcessBotMessages` | Process messages from other bots | `false` |
+| `Voice:FFmpegPath` | Path to FFmpeg executable | `ffmpeg` |
 
 ## Running Locally
 
@@ -148,20 +160,40 @@ docker logs -f erostts
 
 | Command | Description | Permission |
 |---------|-------------|------------|
-| `/tts-setup <text-channel> <voice-channel>` | Configure TTS channels | Manage Guild |
+| `/say <text> [voice-channel]` | Speak text in a voice channel | Everyone |
+| `/tts-setup <voice-channel> [text-channel]` | Configure default voice channel | Manage Guild |
 | `/tts-stop` | Disconnect from voice | Everyone |
-| `/tts-status` | Show current configuration | Everyone |
+| `/tts-status` | Show current configuration and mode | Everyone |
 | `/tts-clear` | Remove TTS configuration | Manage Guild |
 
 ## Usage
 
+### Basic Usage (Slash Commands)
+
 1. Invite the bot to your Discord server
-2. Use `/tts-setup` to configure the text and voice channels:
+2. Join a voice channel
+3. Use `/say` to speak text:
    ```
-   /tts-setup text-channel:#tts-messages voice-channel:General
+   /say text:Hello, this is a test!
    ```
-3. Send messages in the configured text channel
-4. The bot will join the voice channel and read messages aloud
+4. The bot will join your voice channel and speak the text
+
+You can also specify a different voice channel:
+```
+/say text:Hello everyone! voice-channel:General
+```
+
+### Optional: Text Channel Monitoring Mode
+
+If you want the bot to automatically read messages from a text channel (legacy behavior):
+
+1. Set `EnableTextChannelMonitoring` to `true` in your configuration
+2. Enable the **Message Content Intent** in the Discord Developer Portal
+3. Use `/tts-setup` to configure channels:
+   ```
+   /tts-setup voice-channel:General text-channel:#tts-messages
+   ```
+4. Messages sent in the configured text channel will be read aloud automatically
 
 ## Architecture
 
@@ -173,22 +205,29 @@ ErosTTS.Bot/
 │   ├── TTS/               # Eleven Labs API client
 │   ├── Queue/             # Message queue (System.Threading.Channels)
 │   └── Guild/             # Per-guild configuration
-├── Handlers/              # Discord event handlers
-├── Commands/              # Slash commands
-├── HostedServices/        # Background services
+├── Commands/              # Slash commands (/say, /tts-setup, etc.)
+├── HostedServices/        # Background services (queue processor, gateway events)
+├── Utilities/             # Shared utilities (text sanitization)
 └── Exceptions/            # Custom exceptions
 ```
 
 ## Troubleshooting
 
-### Bot doesn't respond to messages
+### Bot doesn't respond to `/say` command
+- Ensure the bot has been invited with `applications.commands` scope
+- Try re-inviting the bot to refresh slash commands
+- Check that you're in a voice channel (or specify one with the `voice-channel` parameter)
+
+### Bot doesn't respond to messages (text channel monitoring mode)
+- Ensure `EnableTextChannelMonitoring` is set to `true` in configuration
 - Ensure Message Content Intent is enabled in the Discord Developer Portal
 - Check that the bot has permission to read the text channel
 - Verify the channel is configured with `/tts-setup`
 
 ### No audio plays
-- Ensure FFmpeg is installed and accessible
+- Ensure FFmpeg is installed and accessible (or set `Voice:FFmpegPath` to the full path)
 - Check that the bot has Connect and Speak permissions in the voice channel
+- Verify the Opus codec is available (included via `OpusDotNet.opus.win-x64` NuGet package)
 - Review logs for TTS API errors
 
 ### Rate limit errors

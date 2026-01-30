@@ -1,18 +1,18 @@
 using ErosTTS.Bot.Configuration;
 using ErosTTS.Bot.Services.Guild;
 using ErosTTS.Bot.Services.Queue;
+using ErosTTS.Bot.Utilities;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NetCord.Gateway;
-using System.Text.RegularExpressions;
 
 namespace ErosTTS.Bot.HostedServices;
 
 /// <summary>
 /// Hosted service that wires up gateway event handlers.
 /// </summary>
-public sealed partial class GatewayEventHostedService : IHostedService
+public sealed class GatewayEventHostedService : IHostedService
 {
     private readonly GatewayClient _gatewayClient;
     private readonly ITtsQueue _queue;
@@ -37,7 +37,16 @@ public sealed partial class GatewayEventHostedService : IHostedService
     public Task StartAsync(CancellationToken cancellationToken)
     {
         _gatewayClient.Ready += OnReady;
-        _gatewayClient.MessageCreate += OnMessageCreate;
+
+        if (_botConfig.EnableTextChannelMonitoring)
+        {
+            _gatewayClient.MessageCreate += OnMessageCreate;
+            _logger.LogInformation("Text channel monitoring enabled");
+        }
+        else
+        {
+            _logger.LogInformation("Text channel monitoring disabled (slash command mode)");
+        }
 
         _logger.LogInformation("Gateway event handlers registered");
         return Task.CompletedTask;
@@ -46,7 +55,11 @@ public sealed partial class GatewayEventHostedService : IHostedService
     public Task StopAsync(CancellationToken cancellationToken)
     {
         _gatewayClient.Ready -= OnReady;
-        _gatewayClient.MessageCreate -= OnMessageCreate;
+
+        if (_botConfig.EnableTextChannelMonitoring)
+        {
+            _gatewayClient.MessageCreate -= OnMessageCreate;
+        }
 
         _logger.LogInformation("Gateway event handlers unregistered");
         return Task.CompletedTask;
@@ -87,7 +100,7 @@ public sealed partial class GatewayEventHostedService : IHostedService
             }
 
             // Sanitize and validate text
-            var text = SanitizeText(message.Content);
+            var text = TextSanitizer.Sanitize(message.Content);
             if (string.IsNullOrWhiteSpace(text))
             {
                 _logger.LogDebug("Skipping empty message from {Username} after sanitization",
@@ -127,72 +140,4 @@ public sealed partial class GatewayEventHostedService : IHostedService
             _logger.LogError(ex, "Failed to process message from {Username}", message.Author.Username);
         }
     }
-
-    /// <summary>
-    /// Sanitizes text by removing Discord-specific formatting.
-    /// </summary>
-    private static string SanitizeText(string input)
-    {
-        if (string.IsNullOrWhiteSpace(input))
-            return string.Empty;
-
-        var text = input;
-
-        // Remove user mentions (<@123456789> or <@!123456789>)
-        text = UserMentionRegex().Replace(text, "");
-
-        // Remove channel mentions (<#123456789>)
-        text = ChannelMentionRegex().Replace(text, "");
-
-        // Remove role mentions (<@&123456789>)
-        text = RoleMentionRegex().Replace(text, "");
-
-        // Remove custom emojis (<:name:123456789> or <a:name:123456789>)
-        text = CustomEmojiRegex().Replace(text, "");
-
-        // Remove URLs
-        text = UrlRegex().Replace(text, "");
-
-        // Remove code blocks
-        text = CodeBlockRegex().Replace(text, "");
-
-        // Remove inline code
-        text = InlineCodeRegex().Replace(text, "");
-
-        // Remove markdown formatting (bold, italic, underline, strikethrough)
-        text = text.Replace("**", "");
-        text = text.Replace("__", "");
-        text = text.Replace("~~", "");
-        text = text.Replace("*", "");
-        text = text.Replace("_", " ");
-
-        // Collapse multiple spaces
-        text = MultipleSpacesRegex().Replace(text, " ");
-
-        return text.Trim();
-    }
-
-    [GeneratedRegex(@"<@!?\d+>")]
-    private static partial Regex UserMentionRegex();
-
-    [GeneratedRegex(@"<#\d+>")]
-    private static partial Regex ChannelMentionRegex();
-
-    [GeneratedRegex(@"<@&\d+>")]
-    private static partial Regex RoleMentionRegex();
-
-    [GeneratedRegex(@"<a?:\w+:\d+>")]
-    private static partial Regex CustomEmojiRegex();
-
-    [GeneratedRegex(@"https?://\S+")]
-    private static partial Regex UrlRegex();
-
-    [GeneratedRegex(@"```[\s\S]*?```")]
-    private static partial Regex CodeBlockRegex();
-
-    [GeneratedRegex(@"`[^`]+`")]
-    private static partial Regex InlineCodeRegex();
-
-    [GeneratedRegex(@"\s{2,}")]
-    private static partial Regex MultipleSpacesRegex();
 }

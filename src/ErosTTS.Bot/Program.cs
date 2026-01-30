@@ -40,6 +40,14 @@ try
 {
     Log.Information("Starting ErosTTS Bot");
 
+    // Build configuration early to determine required gateway intents
+    var configuration = new ConfigurationBuilder()
+        .AddJsonFile("appsettings.json", optional: false)
+        .AddEnvironmentVariables("EROSTTS_")
+        .Build();
+
+    var enableTextChannelMonitoring = configuration.GetValue<bool>("Discord:EnableTextChannelMonitoring");
+
     var builder = Host.CreateDefaultBuilder(args)
         .ConfigureAppConfiguration((context, config) =>
         {
@@ -50,10 +58,19 @@ try
         .UseSerilog()
         .UseDiscordGateway(options =>
         {
-            options.Intents = GatewayIntents.Guilds
-                | GatewayIntents.GuildMessages
-                | GatewayIntents.GuildVoiceStates
-                | GatewayIntents.MessageContent;
+            // Base intents required for slash commands and voice
+            options.Intents = GatewayIntents.Guilds | GatewayIntents.GuildVoiceStates;
+
+            // Only add message intents if text channel monitoring is enabled
+            if (enableTextChannelMonitoring)
+            {
+                options.Intents |= GatewayIntents.GuildMessages | GatewayIntents.MessageContent;
+                Log.Information("Text channel monitoring enabled - requesting GuildMessages and MessageContent intents");
+            }
+            else
+            {
+                Log.Information("Slash command mode - minimal intents requested (no MessageContent privilege required)");
+            }
         })
         .UseApplicationCommands()
         .ConfigureServices((context, services) =>

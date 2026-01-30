@@ -11,7 +11,14 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:netcord.dev)",
       "Bash(winget install:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(where:*)",
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Bash(dotnet add package:*)",
+      "Bash(dotnet remove:*)",
+      "WebFetch(domain:opus-codec.org)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Repos\\\\eros-discord-bot\\\\src\\\\ErosTTS.Bot\" -Recurse -Name)"
     ]
   }
 }
