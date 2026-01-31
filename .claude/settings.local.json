@@ -18,7 +18,10 @@
       "Bash(dotnet add package:*)",
       "Bash(dotnet remove:*)",
       "WebFetch(domain:opus-codec.org)",
-      "Bash(Get-ChildItem -Path \"C:\\\\Repos\\\\eros-discord-bot\\\\src\\\\ErosTTS.Bot\" -Recurse -Name)"
+      "Bash(Get-ChildItem -Path \"C:\\\\Repos\\\\eros-discord-bot\\\\src\\\\ErosTTS.Bot\" -Recurse -Name)",
+      "Bash(git commit:*)",
+      "Bash(git push)",
+      "Bash(dotnet test:*)"
     ]
   }
 }
