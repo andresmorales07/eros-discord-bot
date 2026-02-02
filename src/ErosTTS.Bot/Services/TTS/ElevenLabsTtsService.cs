@@ -32,9 +32,10 @@ public sealed class ElevenLabsTtsService : ITtsService
         _httpClient.Timeout = TimeSpan.FromSeconds(_config.TimeoutSeconds);
     }
 
-    public async Task<Stream> SynthesizeAsync(string text, CancellationToken ct = default)
+    public async Task<Stream> SynthesizeAsync(string text, string? voiceId = null, CancellationToken ct = default)
     {
-        var url = $"{BaseUrl}/text-to-speech/{_config.VoiceId}";
+        var effectiveVoiceId = voiceId ?? _config.VoiceId;
+        var url = $"{BaseUrl}/text-to-speech/{effectiveVoiceId}";
 
         var payload = new
         {
@@ -54,7 +55,7 @@ public sealed class ElevenLabsTtsService : ITtsService
             "application/json");
 
         _logger.LogDebug("Sending TTS request for {CharCount} characters to voice {VoiceId}",
-            text.Length, _config.VoiceId);
+            text.Length, effectiveVoiceId);
 
         HttpResponseMessage response;
         try

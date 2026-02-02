@@ -11,7 +11,8 @@ public interface IGuildConfigurationService
     /// <param name="guildId">The guild ID.</param>
     /// <param name="textChannelId">The text channel to monitor.</param>
     /// <param name="voiceChannelId">The voice channel for playback.</param>
-    Task SetChannelsAsync(ulong guildId, ulong textChannelId, ulong voiceChannelId);
+    /// <param name="voiceId">Optional custom ElevenLabs voice ID.</param>
+    Task SetChannelsAsync(ulong guildId, ulong textChannelId, ulong voiceChannelId, string? voiceId = null);
 
     /// <summary>
     /// Gets the TTS configuration for a guild.

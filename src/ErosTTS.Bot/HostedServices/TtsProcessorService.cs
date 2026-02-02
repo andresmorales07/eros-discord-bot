@@ -133,8 +133,9 @@ public sealed class TtsProcessorService : BackgroundService
         Stream? audioStream = null;
         try
         {
-            _logger.LogDebug("Generating TTS audio for {CharCount} characters", item.Text.Length);
-            audioStream = await _ttsService.SynthesizeAsync(item.Text, ct);
+            _logger.LogDebug("Generating TTS audio for {CharCount} characters using voice {VoiceId}",
+                item.Text.Length, config.VoiceId ?? "(default)");
+            audioStream = await _ttsService.SynthesizeAsync(item.Text, config.VoiceId, ct);
 
             // Play the audio
             _logger.LogDebug("Playing audio in voice channel {ChannelId}", item.VoiceChannelId);

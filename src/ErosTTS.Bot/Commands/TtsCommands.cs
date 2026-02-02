@@ -144,7 +144,9 @@ public sealed class TtsCommands : ApplicationCommandModule<ApplicationCommandCon
         [SlashCommandParameter(Name = "voice-channel", Description = "Default voice channel for TTS playback")]
         VoiceGuildChannel voiceChannel,
         [SlashCommandParameter(Name = "text-channel", Description = "Channel to monitor for auto-TTS (only works if text monitoring is enabled)")]
-        TextGuildChannel? textChannel = null)
+        TextGuildChannel? textChannel = null,
+        [SlashCommandParameter(Name = "voice-id", Description = "ElevenLabs voice ID (leave empty for default)")]
+        string? voiceId = null)
     {
         // Check permissions
         var guildId = Context.Interaction.GuildId;
@@ -164,13 +166,15 @@ public sealed class TtsCommands : ApplicationCommandModule<ApplicationCommandCon
         await _guildConfig.SetChannelsAsync(
             guildId.Value,
             textChannel?.Id ?? 0,
-            voiceChannel.Id);
+            voiceChannel.Id,
+            voiceId);
 
         _logger.LogInformation(
-            "User {UserId} ({Username}) configured TTS for guild {GuildId}: text={TextChannel}, voice={VoiceChannel}",
-            Context.User.Id, Context.User.Username, guildId.Value, textChannel?.Id ?? 0, voiceChannel.Id);
+            "User {UserId} ({Username}) configured TTS for guild {GuildId}: text={TextChannel}, voice={VoiceChannel}, voiceId={VoiceId}",
+            Context.User.Id, Context.User.Username, guildId.Value, textChannel?.Id ?? 0, voiceChannel.Id, voiceId ?? "(default)");
 
         var response = $"**TTS Configuration Updated**\nDefault Voice Channel: <#{voiceChannel.Id}>";
+        response += $"\nVoice ID: `{voiceId ?? "Default"}`";
         if (textChannel != null)
         {
             response += $"\nText Channel Monitoring: <#{textChannel.Id}>";
@@ -237,10 +241,12 @@ public sealed class TtsCommands : ApplicationCommandModule<ApplicationCommandCon
             : "Not set";
         var voiceChannel = config.VoiceChannelId.HasValue ? $"<#{config.VoiceChannelId}>" : "Not set";
         var connectedStatus = isConnected ? "Yes" : "No";
+        var voiceIdDisplay = config.VoiceId ?? "Default";
 
         var response = $"**TTS Bot Status**\n" +
                        $"Mode: {mode}\n" +
                        $"Default Voice Channel: {voiceChannel}\n" +
+                       $"Voice ID: `{voiceIdDisplay}`\n" +
                        $"Voice Connected: {connectedStatus}\n" +
                        $"Queue Size: {queueCount}";
 

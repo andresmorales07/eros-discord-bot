@@ -83,9 +83,9 @@ All commands respond with ephemeral messages (only visible to the user) except `
 
 ### TTS Commands (all ephemeral)
 - `/say <text> [voice-channel]` - Speak text in voice channel
-- `/tts-setup <voice-channel> [text-channel]` - Configure defaults (Manage Guild permission)
+- `/tts-setup <voice-channel> [text-channel] [voice-id]` - Configure defaults (Manage Guild permission)
 - `/tts-stop` - Disconnect from voice
-- `/tts-status` - Show current configuration
+- `/tts-status` - Show current configuration (including voice ID)
 - `/tts-clear` - Remove configuration (Manage Guild permission)
 
 ### AI Character Commands

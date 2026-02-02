@@ -184,9 +184,9 @@ All command responses are **ephemeral** (only visible to the user who ran the co
 | Command | Description | Permission | Visibility |
 |---------|-------------|------------|------------|
 | `/say <text> [voice-channel]` | Speak text in a voice channel | Everyone | Ephemeral |
-| `/tts-setup <voice-channel> [text-channel]` | Configure default voice channel | Manage Guild | Ephemeral |
+| `/tts-setup <voice-channel> [text-channel] [voice-id]` | Configure default voice channel and custom voice | Manage Guild | Ephemeral |
 | `/tts-stop` | Disconnect from voice | Everyone | Ephemeral |
-| `/tts-status` | Show current configuration and mode | Everyone | Ephemeral |
+| `/tts-status` | Show current configuration, mode, and voice ID | Everyone | Ephemeral |
 | `/tts-clear` | Remove TTS configuration | Manage Guild | Ephemeral |
 
 ### AI Character Commands
@@ -214,6 +214,16 @@ You can also specify a different voice channel:
 ```
 /say text:Hello everyone! voice-channel:General
 ```
+
+### Custom Voice per Server
+
+Each Discord server can use a different ElevenLabs voice. Use `/tts-setup` with the `voice-id` parameter:
+
+```
+/tts-setup voice-channel:General voice-id:EXAVITQu4vr4xnSDxMaL
+```
+
+You can find voice IDs in your [ElevenLabs Voice Library](https://elevenlabs.io/voice-library). If no `voice-id` is specified, the default voice from your configuration is used.
 
 ### AI Character Roleplaying
 

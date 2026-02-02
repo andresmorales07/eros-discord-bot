@@ -16,21 +16,22 @@ public sealed class GuildConfigurationService : IGuildConfigurationService
         _logger = logger;
     }
 
-    public Task SetChannelsAsync(ulong guildId, ulong textChannelId, ulong voiceChannelId)
+    public Task SetChannelsAsync(ulong guildId, ulong textChannelId, ulong voiceChannelId, string? voiceId = null)
     {
         var config = new GuildTtsConfiguration
         {
             GuildId = guildId,
             TextChannelId = textChannelId,
             VoiceChannelId = voiceChannelId,
+            VoiceId = voiceId,
             UpdatedAt = DateTimeOffset.UtcNow
         };
 
         _configurations[guildId] = config;
 
         _logger.LogInformation(
-            "Updated TTS configuration for guild {GuildId}: text={TextChannelId}, voice={VoiceChannelId}",
-            guildId, textChannelId, voiceChannelId);
+            "Updated TTS configuration for guild {GuildId}: text={TextChannelId}, voice={VoiceChannelId}, voiceId={VoiceId}",
+            guildId, textChannelId, voiceChannelId, voiceId ?? "(default)");
 
         return Task.CompletedTask;
     }

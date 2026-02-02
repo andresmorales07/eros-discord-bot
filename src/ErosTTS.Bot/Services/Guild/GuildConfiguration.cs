@@ -21,6 +21,11 @@ public sealed record GuildTtsConfiguration
     public ulong? VoiceChannelId { get; init; }
 
     /// <summary>
+    /// Custom ElevenLabs voice ID for this guild. Null uses the default voice.
+    /// </summary>
+    public string? VoiceId { get; init; }
+
+    /// <summary>
     /// When this configuration was last updated.
     /// </summary>
     public DateTimeOffset UpdatedAt { get; init; } = DateTimeOffset.UtcNow;
