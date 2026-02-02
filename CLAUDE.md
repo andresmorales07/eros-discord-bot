@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ErosTTS is a Discord bot that converts text to speech using the Eleven Labs API and plays audio in Discord voice channels. Built with .NET 10, it uses NetCord for Discord integration and supports both slash commands and optional text channel monitoring.
 
+The bot also supports **AI-powered character roleplaying** using OpenRouter API, allowing it to play characters in D&D sessions or similar roleplaying scenarios.
+
 ## Build & Run Commands
 
 ```bash
@@ -28,20 +30,24 @@ cd docker && docker-compose up -d
 - `EROSTTS_ElevenLabs__ApiKey` - Eleven Labs API key (required)
 - `EROSTTS_ElevenLabs__VoiceId` - Voice ID (optional, defaults to Rachel)
 - `EROSTTS_Voice__FFmpegPath` - Path to FFmpeg (optional, defaults to `ffmpeg`)
+- `EROSTTS_OpenRouter__ApiKey` - OpenRouter API key (required for AI features)
+- `EROSTTS_OpenRouter__Model` - LLM model ID (optional, defaults to `anthropic/claude-3.5-sonnet`)
 
 ## Architecture
 
 ```
 src/ErosTTS.Bot/
-├── Commands/              # Slash commands (TtsCommands.cs)
+├── Commands/              # Slash commands (TtsCommands.cs, CharacterCommands.cs)
 ├── Configuration/         # Options pattern config classes
-├── Exceptions/            # Custom exception types
+├── Exceptions/            # Custom exception types (TtsExceptions, LlmExceptions)
 ├── HostedServices/        # Background services
 │   ├── GatewayEventHostedService.cs  # Discord event handlers
 │   └── TtsProcessorService.cs        # Queue processor
 ├── Services/
 │   ├── Audio/             # Discord voice playback (AudioService)
+│   ├── Character/         # Per-guild character state (context, conversation history)
 │   ├── Guild/             # Per-guild configuration storage
+│   ├── LLM/               # OpenRouter API client for AI responses
 │   ├── Queue/             # TTS message queue (System.Threading.Channels)
 │   └── TTS/               # Eleven Labs API client
 ├── Utilities/             # Text sanitization utilities
@@ -52,6 +58,7 @@ src/ErosTTS.Bot/
 
 - **NetCord** (v1.0.0-alpha.460) - Discord library for .NET
 - **Eleven Labs API** - Text-to-speech synthesis
+- **OpenRouter API** - LLM access for AI character responses
 - **Polly** - HTTP retry policies with exponential backoff
 - **Serilog** - Structured logging to console and rolling files
 - **System.Threading.Channels** - Async message queue
@@ -72,11 +79,18 @@ src/ErosTTS.Bot/
 
 ## Slash Commands
 
+### TTS Commands
 - `/say <text> [voice-channel]` - Speak text in voice channel
 - `/tts-setup <voice-channel> [text-channel]` - Configure defaults (Manage Guild permission)
 - `/tts-stop` - Disconnect from voice
 - `/tts-status` - Show current configuration
 - `/tts-clear` - Remove configuration (Manage Guild permission)
+
+### AI Character Commands
+- `/character-context <context> [append]` - Set or append character context/system prompt (ephemeral)
+- `/prompt <message>` - Send a prompt to the AI character, response played via TTS (visible to all)
+- `/character-clear` - Clear character context and conversation history (ephemeral)
+- `/character-status` - View current character state (ephemeral)
 
 ## External Dependencies
 

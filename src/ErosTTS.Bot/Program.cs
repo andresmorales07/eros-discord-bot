@@ -1,7 +1,9 @@
 using ErosTTS.Bot.Configuration;
 using ErosTTS.Bot.HostedServices;
 using ErosTTS.Bot.Services.Audio;
+using ErosTTS.Bot.Services.Character;
 using ErosTTS.Bot.Services.Guild;
+using ErosTTS.Bot.Services.LLM;
 using ErosTTS.Bot.Services.Queue;
 using ErosTTS.Bot.Services.TTS;
 using ErosTTS.Bot.Commands;
@@ -84,15 +86,22 @@ try
                 context.Configuration.GetSection(VoiceConfiguration.SectionName));
             services.Configure<QueueConfiguration>(
                 context.Configuration.GetSection(QueueConfiguration.SectionName));
+            services.Configure<OpenRouterConfiguration>(
+                context.Configuration.GetSection(OpenRouterConfiguration.SectionName));
 
             // HTTP Client for Eleven Labs with retry policy
             services.AddHttpClient<ITtsService, ElevenLabsTtsService>()
+                .AddPolicyHandler(GetRetryPolicy());
+
+            // HTTP Client for OpenRouter with retry policy
+            services.AddHttpClient<ILlmService, OpenRouterService>()
                 .AddPolicyHandler(GetRetryPolicy());
 
             // Application Services
             services.AddSingleton<ITtsQueue, TtsQueue>();
             services.AddSingleton<IAudioService, AudioService>();
             services.AddSingleton<IGuildConfigurationService, GuildConfigurationService>();
+            services.AddSingleton<ICharacterStateService, CharacterStateService>();
 
             // Gateway event handlers (registered as hosted services)
             services.AddHostedService<GatewayEventHostedService>();
@@ -108,6 +117,7 @@ try
 
     // Add slash command modules
     host.AddApplicationCommandModule<TtsCommands>();
+    host.AddApplicationCommandModule<CharacterCommands>();
 
     await host.RunAsync();
 }
