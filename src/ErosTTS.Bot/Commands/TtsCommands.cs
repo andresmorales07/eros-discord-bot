@@ -40,8 +40,15 @@ public sealed class TtsCommands : ApplicationCommandModule<ApplicationCommandCon
         _logger = logger;
     }
 
+    private Task RespondEphemeralAsync(string content) =>
+        RespondAsync(InteractionCallback.Message(new InteractionMessageProperties
+        {
+            Content = content,
+            Flags = MessageFlags.Ephemeral
+        }));
+
     [SlashCommand("say", "Speak text in a voice channel using TTS")]
-    public async Task<string> SayAsync(
+    public async Task SayAsync(
         [SlashCommandParameter(Name = "text", Description = "The text to speak", MaxLength = 500)]
         string text,
         [SlashCommandParameter(Name = "voice-channel", Description = "Voice channel to speak in (defaults to your current channel)")]
@@ -50,7 +57,8 @@ public sealed class TtsCommands : ApplicationCommandModule<ApplicationCommandCon
         var guildId = Context.Interaction.GuildId;
         if (guildId is null)
         {
-            return "This command can only be used in a server.";
+            await RespondEphemeralAsync("This command can only be used in a server.");
+            return;
         }
 
         // Resolve voice channel
@@ -77,7 +85,8 @@ public sealed class TtsCommands : ApplicationCommandModule<ApplicationCommandCon
                 }
                 else
                 {
-                    return "Please join a voice channel or specify one with the voice-channel parameter.";
+                    await RespondEphemeralAsync("Please join a voice channel or specify one with the voice-channel parameter.");
+                    return;
                 }
             }
         }
@@ -86,7 +95,8 @@ public sealed class TtsCommands : ApplicationCommandModule<ApplicationCommandCon
         var sanitizedText = TextSanitizer.Sanitize(text);
         if (string.IsNullOrWhiteSpace(sanitizedText))
         {
-            return "The text cannot be empty after removing special characters.";
+            await RespondEphemeralAsync("The text cannot be empty after removing special characters.");
+            return;
         }
 
         // Truncate if needed
@@ -114,7 +124,7 @@ public sealed class TtsCommands : ApplicationCommandModule<ApplicationCommandCon
             sanitizedText.Length > 50 ? sanitizedText[..50] + "..." : sanitizedText);
 
         var preview = sanitizedText.Length > 100 ? sanitizedText[..100] + "..." : sanitizedText;
-        return $"Queued TTS in <#{resolvedVoiceChannelId}>: \"{preview}\"";
+        await RespondEphemeralAsync($"Queued TTS in <#{resolvedVoiceChannelId}>: \"{preview}\"");
     }
 
     private ulong? GetUserVoiceChannel(ulong guildId, ulong userId)
@@ -130,7 +140,7 @@ public sealed class TtsCommands : ApplicationCommandModule<ApplicationCommandCon
     }
 
     [SlashCommand("tts-setup", "Configure default TTS voice channel for this server")]
-    public async Task<string> SetupAsync(
+    public async Task SetupAsync(
         [SlashCommandParameter(Name = "voice-channel", Description = "Default voice channel for TTS playback")]
         VoiceGuildChannel voiceChannel,
         [SlashCommandParameter(Name = "text-channel", Description = "Channel to monitor for auto-TTS (only works if text monitoring is enabled)")]
@@ -140,13 +150,15 @@ public sealed class TtsCommands : ApplicationCommandModule<ApplicationCommandCon
         var guildId = Context.Interaction.GuildId;
         if (guildId is null)
         {
-            return "This command can only be used in a server.";
+            await RespondEphemeralAsync("This command can only be used in a server.");
+            return;
         }
 
         var member = Context.User as GuildInteractionUser;
         if (member is null || !member.Permissions.HasFlag(Permissions.ManageGuild))
         {
-            return "You need the Manage Server permission to use this command.";
+            await RespondEphemeralAsync("You need the Manage Server permission to use this command.");
+            return;
         }
 
         await _guildConfig.SetChannelsAsync(
@@ -167,16 +179,17 @@ public sealed class TtsCommands : ApplicationCommandModule<ApplicationCommandCon
                 response += " (note: text monitoring is currently disabled in bot config)";
             }
         }
-        return response;
+        await RespondEphemeralAsync(response);
     }
 
     [SlashCommand("tts-stop", "Stop TTS and disconnect from voice")]
-    public async Task<string> StopAsync()
+    public async Task StopAsync()
     {
         var guildId = Context.Interaction.GuildId;
         if (guildId is null)
         {
-            return "This command can only be used in a server.";
+            await RespondEphemeralAsync("This command can only be used in a server.");
+            return;
         }
 
         var wasConnected = _audioService.IsConnected(guildId.Value);
@@ -187,18 +200,19 @@ public sealed class TtsCommands : ApplicationCommandModule<ApplicationCommandCon
             "User {UserId} ({Username}) stopped TTS for guild {GuildId}",
             Context.User.Id, Context.User.Username, guildId.Value);
 
-        return wasConnected
+        await RespondEphemeralAsync(wasConnected
             ? "Disconnected from voice channel."
-            : "Not currently connected to a voice channel.";
+            : "Not currently connected to a voice channel.");
     }
 
     [SlashCommand("tts-status", "Check TTS bot status")]
-    public async Task<string> StatusAsync()
+    public async Task StatusAsync()
     {
         var guildId = Context.Interaction.GuildId;
         if (guildId is null)
         {
-            return "This command can only be used in a server.";
+            await RespondEphemeralAsync("This command can only be used in a server.");
+            return;
         }
 
         var config = await _guildConfig.GetConfigurationAsync(guildId.Value);
@@ -211,10 +225,11 @@ public sealed class TtsCommands : ApplicationCommandModule<ApplicationCommandCon
 
         if (config == null)
         {
-            return $"**TTS Bot Status**\n" +
+            await RespondEphemeralAsync($"**TTS Bot Status**\n" +
                    $"Mode: {mode}\n" +
                    $"Configuration: Not set up\n\n" +
-                   "Use `/say` to speak text, or `/tts-setup` to configure a default voice channel.";
+                   "Use `/say` to speak text, or `/tts-setup` to configure a default voice channel.");
+            return;
         }
 
         var textChannel = config.TextChannelId.HasValue && config.TextChannelId.Value != 0
@@ -236,22 +251,24 @@ public sealed class TtsCommands : ApplicationCommandModule<ApplicationCommandCon
 
         response += $"\nLast Updated: {config.UpdatedAt:g}";
 
-        return response;
+        await RespondEphemeralAsync(response);
     }
 
     [SlashCommand("tts-clear", "Clear the TTS configuration for this server")]
-    public async Task<string> ClearAsync()
+    public async Task ClearAsync()
     {
         var guildId = Context.Interaction.GuildId;
         if (guildId is null)
         {
-            return "This command can only be used in a server.";
+            await RespondEphemeralAsync("This command can only be used in a server.");
+            return;
         }
 
         var member = Context.User as GuildInteractionUser;
         if (member is null || !member.Permissions.HasFlag(Permissions.ManageGuild))
         {
-            return "You need the Manage Server permission to use this command.";
+            await RespondEphemeralAsync("You need the Manage Server permission to use this command.");
+            return;
         }
 
         await _audioService.DisconnectAsync(guildId.Value);
@@ -261,6 +278,6 @@ public sealed class TtsCommands : ApplicationCommandModule<ApplicationCommandCon
             "User {UserId} ({Username}) cleared TTS configuration for guild {GuildId}",
             Context.User.Id, Context.User.Username, guildId.Value);
 
-        return "TTS configuration has been cleared for this server.";
+        await RespondEphemeralAsync("TTS configuration has been cleared for this server.");
     }
 }

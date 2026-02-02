@@ -41,8 +41,15 @@ public sealed class CharacterCommands : ApplicationCommandModule<ApplicationComm
         _logger = logger;
     }
 
+    private Task RespondEphemeralAsync(string content) =>
+        RespondAsync(InteractionCallback.Message(new InteractionMessageProperties
+        {
+            Content = content,
+            Flags = MessageFlags.Ephemeral
+        }));
+
     [SlashCommand("character-context", "Set or append character context for the AI")]
-    public async Task<string> SetContextAsync(
+    public async Task SetContextAsync(
         [SlashCommandParameter(Name = "context", Description = "Character context/system prompt", MaxLength = 2000)]
         string context,
         [SlashCommandParameter(Name = "append", Description = "Append to existing context instead of replacing")]
@@ -51,7 +58,8 @@ public sealed class CharacterCommands : ApplicationCommandModule<ApplicationComm
         var guildId = Context.Interaction.GuildId;
         if (guildId is null)
         {
-            return "This command can only be used in a server.";
+            await RespondEphemeralAsync("This command can only be used in a server.");
+            return;
         }
 
         await _characterState.SetContextAsync(guildId.Value, context, append);
@@ -66,7 +74,7 @@ public sealed class CharacterCommands : ApplicationCommandModule<ApplicationComm
             ? state.Context[..100] + "..."
             : state?.Context ?? "";
 
-        return $"Character context {action}.\n\n**Current context:**\n{preview}";
+        await RespondEphemeralAsync($"Character context {action}.\n\n**Current context:**\n{preview}");
     }
 
     [SlashCommand("prompt", "Send a prompt to the AI character and hear the response")]
@@ -167,12 +175,13 @@ public sealed class CharacterCommands : ApplicationCommandModule<ApplicationComm
     }
 
     [SlashCommand("character-clear", "Clear character context and conversation history")]
-    public async Task<string> ClearAsync()
+    public async Task ClearAsync()
     {
         var guildId = Context.Interaction.GuildId;
         if (guildId is null)
         {
-            return "This command can only be used in a server.";
+            await RespondEphemeralAsync("This command can only be used in a server.");
+            return;
         }
 
         await _characterState.ClearStateAsync(guildId.Value);
@@ -181,33 +190,35 @@ public sealed class CharacterCommands : ApplicationCommandModule<ApplicationComm
             "User {UserId} ({Username}) cleared character state for guild {GuildId}",
             Context.User.Id, Context.User.Username, guildId.Value);
 
-        return "Character context and conversation history have been cleared.";
+        await RespondEphemeralAsync("Character context and conversation history have been cleared.");
     }
 
     [SlashCommand("character-status", "View current character context and history size")]
-    public async Task<string> StatusAsync()
+    public async Task StatusAsync()
     {
         var guildId = Context.Interaction.GuildId;
         if (guildId is null)
         {
-            return "This command can only be used in a server.";
+            await RespondEphemeralAsync("This command can only be used in a server.");
+            return;
         }
 
         var state = await _characterState.GetStateAsync(guildId.Value);
 
         if (state == null)
         {
-            return "**Character Status**\nNo character context set. Use `/character-context` to set one.";
+            await RespondEphemeralAsync("**Character Status**\nNo character context set. Use `/character-context` to set one.");
+            return;
         }
 
         var contextPreview = state.Context.Length > 200
             ? state.Context[..200] + "..."
             : state.Context;
 
-        return $"**Character Status**\n" +
+        await RespondEphemeralAsync($"**Character Status**\n" +
                $"Context Length: {state.Context.Length} characters\n" +
                $"Conversation History: {state.ConversationHistory.Count} messages\n" +
                $"Last Updated: {state.UpdatedAt:g}\n\n" +
-               $"**Context Preview:**\n{contextPreview}";
+               $"**Context Preview:**\n{contextPreview}");
     }
 }

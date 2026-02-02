@@ -6,6 +6,7 @@ A Discord bot that converts text to speech using the Eleven Labs API and plays i
 
 - **Slash command TTS** - Use `/say` to speak text in voice channels
 - **AI Character Roleplaying** - Set character context and prompt an AI to respond in character via TTS
+- **Privacy-focused** - Bot joins voice channels self-deafened and command responses are ephemeral (except `/prompt`)
 - Converts text to speech using Eleven Labs TTS API
 - AI responses powered by OpenRouter (supports Claude, GPT, and other models)
 - Automatic voice channel detection (joins your current voice channel)
@@ -176,22 +177,24 @@ docker logs -f erostts
 
 ## Slash Commands
 
+All command responses are **ephemeral** (only visible to the user who ran the command) except `/prompt` which shows the conversation publicly.
+
 ### TTS Commands
 
-| Command | Description | Permission |
-|---------|-------------|------------|
-| `/say <text> [voice-channel]` | Speak text in a voice channel | Everyone |
-| `/tts-setup <voice-channel> [text-channel]` | Configure default voice channel | Manage Guild |
-| `/tts-stop` | Disconnect from voice | Everyone |
-| `/tts-status` | Show current configuration and mode | Everyone |
-| `/tts-clear` | Remove TTS configuration | Manage Guild |
+| Command | Description | Permission | Visibility |
+|---------|-------------|------------|------------|
+| `/say <text> [voice-channel]` | Speak text in a voice channel | Everyone | Ephemeral |
+| `/tts-setup <voice-channel> [text-channel]` | Configure default voice channel | Manage Guild | Ephemeral |
+| `/tts-stop` | Disconnect from voice | Everyone | Ephemeral |
+| `/tts-status` | Show current configuration and mode | Everyone | Ephemeral |
+| `/tts-clear` | Remove TTS configuration | Manage Guild | Ephemeral |
 
 ### AI Character Commands
 
 | Command | Description | Visibility |
 |---------|-------------|------------|
 | `/character-context <context> [append]` | Set or append character context/system prompt | Ephemeral |
-| `/prompt <message>` | Send a prompt to the AI character (response via TTS) | Public |
+| `/prompt <message>` | Send a prompt to the AI character (response via TTS) | **Public** |
 | `/character-clear` | Clear character context and conversation history | Ephemeral |
 | `/character-status` | View current character state | Ephemeral |
 
@@ -300,6 +303,7 @@ ErosTTS.Bot/
 
 ### Voice connection issues
 - The bot will automatically reconnect on disconnect
+- The bot joins voice channels **self-deafened** (this is intentional - it doesn't need to hear voice chat)
 - Check Discord server region and latency
 - Ensure the bot isn't banned from the voice channel
 

@@ -174,6 +174,12 @@ public sealed class AudioService : IAudioService, IAsyncDisposable
 
                     await voiceClient.StartAsync();
 
+                    // Set self-deafen state (bot doesn't need to hear voice chat)
+                    await _gatewayClient.UpdateVoiceStateAsync(new VoiceStateProperties(guildId, voiceChannelId)
+                    {
+                        SelfDeaf = true
+                    });
+
                     _voiceClients[guildId] = voiceClient;
 
                     _logger.LogInformation("Successfully connected to voice in guild {GuildId}", guildId);

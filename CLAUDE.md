@@ -79,7 +79,9 @@ src/ErosTTS.Bot/
 
 ## Slash Commands
 
-### TTS Commands
+All commands respond with ephemeral messages (only visible to the user) except `/prompt` which is public.
+
+### TTS Commands (all ephemeral)
 - `/say <text> [voice-channel]` - Speak text in voice channel
 - `/tts-setup <voice-channel> [text-channel]` - Configure defaults (Manage Guild permission)
 - `/tts-stop` - Disconnect from voice
@@ -88,9 +90,14 @@ src/ErosTTS.Bot/
 
 ### AI Character Commands
 - `/character-context <context> [append]` - Set or append character context/system prompt (ephemeral)
-- `/prompt <message>` - Send a prompt to the AI character, response played via TTS (visible to all)
+- `/prompt <message>` - Send a prompt to the AI character, response played via TTS (**public** - visible to all)
 - `/character-clear` - Clear character context and conversation history (ephemeral)
 - `/character-status` - View current character state (ephemeral)
+
+## Voice Channel Behavior
+
+- Bot joins voice channels **self-deafened** by default (doesn't listen to voice chat)
+- Uses `UpdateVoiceStateAsync` with `SelfDeaf = true` after connecting
 
 ## External Dependencies
 

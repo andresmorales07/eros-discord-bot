@@ -21,7 +21,8 @@
       "Bash(Get-ChildItem -Path \"C:\\\\Repos\\\\eros-discord-bot\\\\src\\\\ErosTTS.Bot\" -Recurse -Name)",
       "Bash(git commit:*)",
       "Bash(git push)",
-      "Bash(dotnet test:*)"
+      "Bash(dotnet test:*)",
+      "Bash(find:*)"
     ]
   }
 }
