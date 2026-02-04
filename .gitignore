@@ -101,3 +101,6 @@ appsettings.Local.json
 *.env
 .env
 nul
+
+# Claude Code
+.claude/settings.local.json
