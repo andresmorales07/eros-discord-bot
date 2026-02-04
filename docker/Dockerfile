@@ -14,11 +14,12 @@ RUN dotnet publish -c Release -o /app/publish --no-restore
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-preview-alpine AS runtime
 
-# Install FFmpeg for audio conversion (MP3 to PCM)
-# Note: NetCord bundles its own Opus/Sodium native libraries
+# Install FFmpeg for audio conversion (MP3 to PCM) and Opus codec for Discord voice
+# Note: opus is required for NetCord voice - the NuGet package only includes Windows binaries
 RUN apk add --no-cache \
     ffmpeg \
-    icu-libs
+    icu-libs \
+    opus
 
 # Create non-root user for security
 RUN addgroup -S erostts && adduser -S erostts -G erostts
