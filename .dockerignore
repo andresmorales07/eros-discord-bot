@@ -1,0 +1,36 @@
+# Build outputs
+**/bin/
+**/obj/
+**/out/
+
+# IDE and editor files
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+
+# Git
+.git/
+.gitignore
+
+# Docker
+docker-compose*.yml
+Dockerfile*
+
+# Logs
+logs/
+*.log
+
+# Test results
+**/TestResults/
+
+# Local settings (may contain secrets)
+appsettings.json
+appsettings.*.json
+!appsettings.example.json
+*.env
+.env
+
+# Claude Code
+.claude/

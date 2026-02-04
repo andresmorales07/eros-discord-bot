@@ -12,7 +12,7 @@ WORKDIR /src/ErosTTS.Bot
 RUN dotnet publish -c Release -o /app/publish --no-restore
 
 # Runtime stage
-FROM mcr.microsoft.com/dotnet/runtime:10.0-preview-alpine AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-preview-alpine AS runtime
 
 # Install FFmpeg for audio conversion (MP3 to PCM)
 # Note: NetCord bundles its own Opus/Sodium native libraries
