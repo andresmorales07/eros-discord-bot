@@ -67,6 +67,7 @@ src/ErosTTS.Bot/
 ## Code Patterns
 
 - **Options pattern**: All configuration uses `IOptions<T>` with sections bound in `Program.cs`
+- **Configuration sync**: When modifying `Configuration/*.cs` classes, update `appsettings.example.json` to include any new properties with sensible defaults
 - **Hosted services**: Background work via `IHostedService` (queue processing, gateway events)
 - **Slash commands**: NetCord's `ApplicationCommandModule<ApplicationCommandContext>` base class
 - **DI**: All services registered in `Program.cs` ConfigureServices
