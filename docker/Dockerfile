@@ -19,7 +19,9 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0-preview-alpine AS runtime
 RUN apk add --no-cache \
     ffmpeg \
     icu-libs \
-    opus
+    opus \
+    && ln -s /usr/lib/libopus.so.0 /usr/lib/opus.so \
+    && ln -s /usr/lib/libopus.so.0 /usr/lib/libopus.so
 
 # Create non-root user for security
 RUN addgroup -S erostts && adduser -S erostts -G erostts
