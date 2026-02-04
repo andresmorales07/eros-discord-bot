@@ -24,14 +24,113 @@ dotnet build -c Release
 cd docker && docker-compose up -d
 ```
 
-## Required Environment Variables
+## Environment Variables
 
-- `EROSTTS_Discord__Token` - Discord bot token (required)
-- `EROSTTS_ElevenLabs__ApiKey` - Eleven Labs API key (required)
-- `EROSTTS_ElevenLabs__VoiceId` - Voice ID (optional, defaults to Rachel)
-- `EROSTTS_Voice__FFmpegPath` - Path to FFmpeg (optional, defaults to `ffmpeg`)
-- `EROSTTS_OpenRouter__ApiKey` - OpenRouter API key (required for AI features)
-- `EROSTTS_OpenRouter__Model` - LLM model ID (optional, defaults to `anthropic/claude-3.5-sonnet`)
+### Required
+| Variable | Description |
+|----------|-------------|
+| `EROSTTS_Discord__Token` | Discord bot token |
+| `EROSTTS_ElevenLabs__ApiKey` | Eleven Labs API key |
+
+### Required for AI Features
+| Variable | Description |
+|----------|-------------|
+| `EROSTTS_OpenRouter__ApiKey` | OpenRouter API key (only needed if using `/prompt` command) |
+
+### Optional
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `EROSTTS_ElevenLabs__VoiceId` | `21m00Tcm4TlvDq8ikWAM` | Eleven Labs voice ID (Rachel) |
+| `EROSTTS_ElevenLabs__ModelId` | `eleven_multilingual_v2` | Eleven Labs model |
+| `EROSTTS_ElevenLabs__Stability` | `0.5` | Voice stability (0.0-1.0) |
+| `EROSTTS_ElevenLabs__SimilarityBoost` | `0.75` | Voice similarity boost (0.0-1.0) |
+| `EROSTTS_OpenRouter__Model` | `anthropic/claude-3.5-sonnet` | LLM model ID |
+| `EROSTTS_OpenRouter__MaxTokens` | `500` | Max response tokens |
+| `EROSTTS_OpenRouter__Temperature` | `0.8` | LLM temperature (0.0-2.0) |
+| `EROSTTS_OpenRouter__DefaultSystemPrompt` | *(empty)* | Default system prompt prepended to all AI requests |
+| `EROSTTS_Discord__EnableTextChannelMonitoring` | `false` | Monitor text channels (requires Message Content Intent) |
+| `EROSTTS_Discord__MaxMessageLength` | `500` | Max TTS message length |
+| `EROSTTS_Voice__FFmpegPath` | `ffmpeg` | Path to FFmpeg binary |
+
+## Docker
+
+### Docker Run
+
+```bash
+# Build the image
+docker build -f docker/Dockerfile -t erostts-bot .
+
+# Run with required variables only (TTS features)
+docker run -d \
+  --name erostts-bot \
+  -e EROSTTS_Discord__Token=your_discord_token \
+  -e EROSTTS_ElevenLabs__ApiKey=your_elevenlabs_key \
+  -v ./logs:/app/logs \
+  erostts-bot
+
+# Run with AI features enabled
+docker run -d \
+  --name erostts-bot \
+  -e EROSTTS_Discord__Token=your_discord_token \
+  -e EROSTTS_ElevenLabs__ApiKey=your_elevenlabs_key \
+  -e EROSTTS_OpenRouter__ApiKey=your_openrouter_key \
+  -e EROSTTS_OpenRouter__DefaultSystemPrompt="Keep responses concise. Respond in character." \
+  -v ./logs:/app/logs \
+  erostts-bot
+```
+
+### Docker Compose
+
+Create a `.env` file in the `docker/` directory:
+
+```env
+# Required
+DISCORD_TOKEN=your_discord_token
+ELEVENLABS_API_KEY=your_elevenlabs_key
+
+# Required for AI features (optional if not using /prompt)
+OPENROUTER_API_KEY=your_openrouter_key
+
+# Optional overrides
+ELEVENLABS_VOICE_ID=21m00Tcm4TlvDq8ikWAM
+OPENROUTER_MODEL=anthropic/claude-3.5-sonnet
+OPENROUTER_DEFAULT_SYSTEM_PROMPT=Keep responses concise. Respond in character.
+```
+
+Example `docker-compose.yml`:
+
+```yaml
+services:
+  erostts:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: erostts-bot
+    restart: unless-stopped
+    environment:
+      - DOTNET_ENVIRONMENT=Production
+      # Required
+      - EROSTTS_Discord__Token=${DISCORD_TOKEN}
+      - EROSTTS_ElevenLabs__ApiKey=${ELEVENLABS_API_KEY}
+      # Required for AI features
+      - EROSTTS_OpenRouter__ApiKey=${OPENROUTER_API_KEY}
+      # Optional
+      - EROSTTS_ElevenLabs__VoiceId=${ELEVENLABS_VOICE_ID:-21m00Tcm4TlvDq8ikWAM}
+      - EROSTTS_OpenRouter__Model=${OPENROUTER_MODEL:-anthropic/claude-3.5-sonnet}
+      - EROSTTS_OpenRouter__DefaultSystemPrompt=${OPENROUTER_DEFAULT_SYSTEM_PROMPT:-}
+    volumes:
+      - ../logs:/app/logs
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+```
+
+Run with:
+```bash
+cd docker && docker-compose up -d
+```
 
 ## Architecture
 
