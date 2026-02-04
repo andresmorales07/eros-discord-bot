@@ -42,4 +42,10 @@ public sealed class OpenRouterConfiguration
     /// Older messages are trimmed when this limit is exceeded.
     /// </summary>
     public int MaxHistoryMessages { get; init; } = 20;
+
+    /// <summary>
+    /// Default system prompt that is always prepended to OpenRouter API requests.
+    /// This is combined with per-guild character context (default first, then character context).
+    /// </summary>
+    public string DefaultSystemPrompt { get; init; } = string.Empty;
 }

@@ -43,10 +43,11 @@ public sealed class OpenRouterService : ILlmService
     {
         var messages = new List<object>();
 
-        // Add system prompt if present
-        if (!string.IsNullOrWhiteSpace(systemPrompt))
+        // Combine default system prompt with per-guild character context
+        var effectiveSystemPrompt = CombineSystemPrompts(_config.DefaultSystemPrompt, systemPrompt);
+        if (!string.IsNullOrWhiteSpace(effectiveSystemPrompt))
         {
-            messages.Add(new { role = "system", content = systemPrompt });
+            messages.Add(new { role = "system", content = effectiveSystemPrompt });
         }
 
         // Add conversation history
@@ -129,6 +130,23 @@ public sealed class OpenRouterService : ILlmService
             assistantMessage.Length);
 
         return assistantMessage;
+    }
+
+    /// <summary>
+    /// Combines the default system prompt with per-guild character context.
+    /// </summary>
+    private static string CombineSystemPrompts(string defaultPrompt, string characterContext)
+    {
+        var hasDefault = !string.IsNullOrWhiteSpace(defaultPrompt);
+        var hasCharacter = !string.IsNullOrWhiteSpace(characterContext);
+
+        return (hasDefault, hasCharacter) switch
+        {
+            (true, true) => $"{defaultPrompt}\n\n{characterContext}",
+            (true, false) => defaultPrompt,
+            (false, true) => characterContext,
+            (false, false) => string.Empty
+        };
     }
 
     public async Task<bool> ValidateApiKeyAsync(CancellationToken ct = default)
