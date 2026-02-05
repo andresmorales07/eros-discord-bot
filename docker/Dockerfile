@@ -32,8 +32,8 @@ WORKDIR /app
 # Copy published application
 COPY --from=build /app/publish .
 
-# Create logs directory and set ownership
-RUN mkdir -p /app/logs && chown -R erostts:erostts /app
+# Create logs and data directories and set ownership
+RUN mkdir -p /app/logs /app/data && chown -R erostts:erostts /app
 
 # Switch to non-root user
 USER erostts
@@ -43,6 +43,8 @@ ENV DOTNET_ENVIRONMENT=Production
 ENV EROSTTS_Discord__Token=""
 ENV EROSTTS_ElevenLabs__ApiKey=""
 ENV EROSTTS_Voice__FFmpegPath="/usr/bin/ffmpeg"
+ENV EROSTTS_Database__Provider="Sqlite"
+ENV EROSTTS_Database__ConnectionString="Data Source=data/erostts.db"
 
 # Health check - verify the process is running
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \

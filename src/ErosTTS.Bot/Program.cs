@@ -1,12 +1,13 @@
 using ErosTTS.Bot.Configuration;
+using ErosTTS.Bot.Data;
+using ErosTTS.Bot.Extensions;
 using ErosTTS.Bot.HostedServices;
 using ErosTTS.Bot.Services.Audio;
-using ErosTTS.Bot.Services.Character;
-using ErosTTS.Bot.Services.Guild;
 using ErosTTS.Bot.Services.LLM;
 using ErosTTS.Bot.Services.Queue;
 using ErosTTS.Bot.Services.TTS;
 using ErosTTS.Bot.Commands;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -88,6 +89,8 @@ try
                 context.Configuration.GetSection(QueueConfiguration.SectionName));
             services.Configure<OpenRouterConfiguration>(
                 context.Configuration.GetSection(OpenRouterConfiguration.SectionName));
+            services.Configure<DatabaseConfiguration>(
+                context.Configuration.GetSection(DatabaseConfiguration.SectionName));
 
             // HTTP Client for Eleven Labs with retry policy
             services.AddHttpClient<ITtsService, ElevenLabsTtsService>()
@@ -100,8 +103,9 @@ try
             // Application Services
             services.AddSingleton<ITtsQueue, TtsQueue>();
             services.AddSingleton<IAudioService, AudioService>();
-            services.AddSingleton<IGuildConfigurationService, GuildConfigurationService>();
-            services.AddSingleton<ICharacterStateService, CharacterStateService>();
+
+            // Persistence (guild config + character state) — provider-driven
+            services.AddPersistence(context.Configuration);
 
             // Gateway event handlers (registered as hosted services)
             services.AddHostedService<GatewayEventHostedService>();
@@ -111,6 +115,28 @@ try
         });
 
     var host = builder.Build();
+
+    // Apply database migrations at startup (only when using a database provider)
+    var dbConfig = host.Services.GetService<IOptions<DatabaseConfiguration>>()?.Value;
+    if (dbConfig?.Provider.ToLowerInvariant() is "sqlite" or "postgres" or "postgresql")
+    {
+        // Ensure the directory exists for file-based providers (SQLite)
+        if (dbConfig.Provider.Equals("sqlite", StringComparison.OrdinalIgnoreCase))
+        {
+            var builder2 = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder(dbConfig.ConnectionString);
+            var dbPath = builder2.DataSource;
+            var dbDir = Path.GetDirectoryName(dbPath);
+            if (!string.IsNullOrEmpty(dbDir))
+            {
+                Directory.CreateDirectory(dbDir);
+            }
+        }
+
+        var factory = host.Services.GetRequiredService<IDbContextFactory<ErosTtsDbContext>>();
+        await using var db = await factory.CreateDbContextAsync();
+        await db.Database.MigrateAsync();
+        Log.Information("Database migrations applied for provider {Provider}", dbConfig.Provider);
+    }
 
     // Validate configuration at startup
     ValidateConfiguration(host.Services);

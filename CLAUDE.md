@@ -51,6 +51,8 @@ cd docker && docker-compose up -d
 | `EROSTTS_Discord__EnableTextChannelMonitoring` | `false` | Monitor text channels (requires Message Content Intent) |
 | `EROSTTS_Discord__MaxMessageLength` | `500` | Max TTS message length |
 | `EROSTTS_Voice__FFmpegPath` | `ffmpeg` | Path to FFmpeg binary |
+| `EROSTTS_Database__Provider` | `InMemory` | Database provider: `InMemory`, `Sqlite`, or `Postgres` |
+| `EROSTTS_Database__ConnectionString` | `Data Source=data/erostts.db` | Database connection string (ignored for InMemory) |
 
 ## Docker
 
@@ -66,6 +68,7 @@ docker run -d \
   -e EROSTTS_Discord__Token=your_discord_token \
   -e EROSTTS_ElevenLabs__ApiKey=your_elevenlabs_key \
   -v ./logs:/app/logs \
+  -v ./data:/app/data \
   erostts-bot
 
 # Run with AI features enabled
@@ -76,6 +79,7 @@ docker run -d \
   -e EROSTTS_OpenRouter__ApiKey=your_openrouter_key \
   -e EROSTTS_OpenRouter__DefaultSystemPrompt="Keep responses concise. Respond in character." \
   -v ./logs:/app/logs \
+  -v ./data:/app/data \
   erostts-bot
 ```
 
@@ -95,6 +99,10 @@ OPENROUTER_API_KEY=your_openrouter_key
 ELEVENLABS_VOICE_ID=21m00Tcm4TlvDq8ikWAM
 OPENROUTER_MODEL=anthropic/claude-3.5-sonnet
 OPENROUTER_DEFAULT_SYSTEM_PROMPT=Keep responses concise. Respond in character.
+
+# Database (defaults to Sqlite in Docker)
+# DATABASE_PROVIDER=Sqlite
+# DATABASE_CONNECTION_STRING=Data Source=data/erostts.db
 ```
 
 Example `docker-compose.yml`:
@@ -118,8 +126,11 @@ services:
       - EROSTTS_ElevenLabs__VoiceId=${ELEVENLABS_VOICE_ID:-21m00Tcm4TlvDq8ikWAM}
       - EROSTTS_OpenRouter__Model=${OPENROUTER_MODEL:-anthropic/claude-3.5-sonnet}
       - EROSTTS_OpenRouter__DefaultSystemPrompt=${OPENROUTER_DEFAULT_SYSTEM_PROMPT:-}
+      - EROSTTS_Database__Provider=${DATABASE_PROVIDER:-Sqlite}
+      - EROSTTS_Database__ConnectionString=${DATABASE_CONNECTION_STRING:-Data Source=data/erostts.db}
     volumes:
       - ../logs:/app/logs
+      - ../data:/app/data
     logging:
       driver: "json-file"
       options:
@@ -138,14 +149,21 @@ cd docker && docker-compose up -d
 src/ErosTTS.Bot/
 ├── Commands/              # Slash commands (TtsCommands.cs, CharacterCommands.cs)
 ├── Configuration/         # Options pattern config classes
+├── Data/                  # EF Core persistence layer
+│   ├── Converters/        # Discord ID ulong<->long converter
+│   ├── Entities/          # EF entity classes
+│   ├── Migrations/        # EF Core migrations
+│   ├── ErosTtsDbContext.cs
+│   └── DesignTimeDbContextFactory.cs
 ├── Exceptions/            # Custom exception types (TtsExceptions, LlmExceptions)
+├── Extensions/            # DI registration extensions (DatabaseServiceExtensions)
 ├── HostedServices/        # Background services
 │   ├── GatewayEventHostedService.cs  # Discord event handlers
 │   └── TtsProcessorService.cs        # Queue processor
 ├── Services/
 │   ├── Audio/             # Discord voice playback (AudioService)
-│   ├── Character/         # Per-guild character state (context, conversation history)
-│   ├── Guild/             # Per-guild configuration storage
+│   ├── Character/         # Per-guild character state (in-memory + EF implementations)
+│   ├── Guild/             # Per-guild configuration storage (in-memory + EF implementations)
 │   ├── LLM/               # OpenRouter API client for AI responses
 │   ├── Queue/             # TTS message queue (System.Threading.Channels)
 │   └── TTS/               # Eleven Labs API client
@@ -162,6 +180,7 @@ src/ErosTTS.Bot/
 - **Serilog** - Structured logging to console and rolling files
 - **System.Threading.Channels** - Async message queue
 - **OpusDotNet** - Audio codec for Discord voice
+- **Entity Framework Core** (SQLite) - Database persistence for guild configuration and character state
 
 ## Code Patterns
 
@@ -170,6 +189,7 @@ src/ErosTTS.Bot/
 - **Hosted services**: Background work via `IHostedService` (queue processing, gateway events)
 - **Slash commands**: NetCord's `ApplicationCommandModule<ApplicationCommandContext>` base class
 - **DI**: All services registered in `Program.cs` ConfigureServices
+- **Persistence**: Config-driven provider selection (`Database:Provider`): `InMemory` (default, ConcurrentDictionary), `Sqlite` (EF Core), or `Postgres` (future). EF services use `IDbContextFactory<T>` to stay singleton-compatible.
 - **Async throughout**: Methods return `Task` or `Task<T>`
 
 ## Configuration Modes
