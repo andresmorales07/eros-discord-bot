@@ -1,4 +1,5 @@
 ---
+name: docs-updater
 description: Update CLAUDE.md and documentation after code changes
 tools:
   - Bash

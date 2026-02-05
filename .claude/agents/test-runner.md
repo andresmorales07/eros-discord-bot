@@ -1,4 +1,5 @@
 ---
+name: test-runner
 description: Run .NET unit tests and report results with failure details
 tools:
   - Bash
