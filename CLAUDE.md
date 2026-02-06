@@ -20,7 +20,10 @@ dotnet build
 # Build release
 dotnet build -c Release
 
-# Run with Docker
+# Run with Docker (GHCR image)
+docker compose up -d
+
+# Run with Docker (local build)
 cd docker && docker-compose up -d
 ```
 
@@ -56,68 +59,25 @@ cd docker && docker-compose up -d
 
 ## Docker
 
-### Docker Run
+The bot image is published to `ghcr.io/andresmorales07/eros-discord-bot`.
 
-```bash
-# Build the image
-docker build -f docker/Dockerfile -t erostts-bot .
-
-# Run with required variables only (TTS features)
-docker run -d \
-  --name erostts-bot \
-  -e EROSTTS_Discord__Token=your_discord_token \
-  -e EROSTTS_ElevenLabs__ApiKey=your_elevenlabs_key \
-  -v ./logs:/app/logs \
-  -v ./data:/app/data \
-  erostts-bot
-
-# Run with AI features enabled
-docker run -d \
-  --name erostts-bot \
-  -e EROSTTS_Discord__Token=your_discord_token \
-  -e EROSTTS_ElevenLabs__ApiKey=your_elevenlabs_key \
-  -e EROSTTS_OpenRouter__ApiKey=your_openrouter_key \
-  -e EROSTTS_OpenRouter__DefaultSystemPrompt="Keep responses concise. Respond in character." \
-  -v ./logs:/app/logs \
-  -v ./data:/app/data \
-  erostts-bot
-```
-
-### Docker Compose
-
-Create a `.env` file in the `docker/` directory:
-
-```env
-# Required
-DISCORD_TOKEN=your_discord_token
-ELEVENLABS_API_KEY=your_elevenlabs_key
-
-# Required for AI features (optional if not using /prompt)
-OPENROUTER_API_KEY=your_openrouter_key
-
-# Optional overrides
-ELEVENLABS_VOICE_ID=21m00Tcm4TlvDq8ikWAM
-OPENROUTER_MODEL=anthropic/claude-3.5-sonnet
-OPENROUTER_DEFAULT_SYSTEM_PROMPT=Keep responses concise. Respond in character.
-
-# Database (defaults to Sqlite in Docker)
-# DATABASE_PROVIDER=Sqlite
-# DATABASE_CONNECTION_STRING=Data Source=data/erostts.db
-```
-
-Example `docker-compose.yml`:
+### Docker Compose (GHCR image)
 
 ```yaml
 services:
-  erostts:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    container_name: erostts-bot
+  eros-discord-bot:
+    container_name: eros-discord-bot
+    volumes:
+      - data:/app/data
+      - logs:/app/logs
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    image: ghcr.io/andresmorales07/eros-discord-bot:latest
     environment:
-      - DOTNET_ENVIRONMENT=Production
-      # Required
       - EROSTTS_Discord__Token=${DISCORD_TOKEN}
       - EROSTTS_ElevenLabs__ApiKey=${ELEVENLABS_API_KEY}
       # Required for AI features
@@ -128,18 +88,21 @@ services:
       - EROSTTS_OpenRouter__DefaultSystemPrompt=${OPENROUTER_DEFAULT_SYSTEM_PROMPT:-}
       - EROSTTS_Database__Provider=${DATABASE_PROVIDER:-Sqlite}
       - EROSTTS_Database__ConnectionString=${DATABASE_CONNECTION_STRING:-Data Source=data/erostts.db}
-    volumes:
-      - ../logs:/app/logs
-      - ../data:/app/data
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+
+volumes:
+  logs:
+    name: eros-discord-bot-logs
+  data:
+    name: eros-discord-bot-data
 ```
 
-Run with:
+### Building from Source
+
 ```bash
+# Build the image locally
+docker build -f docker/Dockerfile -t eros-discord-bot .
+
+# Run with docker-compose (uses local build)
 cd docker && docker-compose up -d
 ```
 

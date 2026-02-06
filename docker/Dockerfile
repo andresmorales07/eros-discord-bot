@@ -42,7 +42,11 @@ USER erostts
 ENV DOTNET_ENVIRONMENT=Production
 ENV EROSTTS_Discord__Token=""
 ENV EROSTTS_ElevenLabs__ApiKey=""
+ENV EROSTTS_ElevenLabs__VoiceId="21m00Tcm4TlvDq8ikWAM"
 ENV EROSTTS_Voice__FFmpegPath="/usr/bin/ffmpeg"
+ENV EROSTTS_OpenRouter__ApiKey=""
+ENV EROSTTS_OpenRouter__Model="anthropic/claude-3.5-sonnet"
+ENV EROSTTS_OpenRouter__DefaultSystemPrompt=""
 ENV EROSTTS_Database__Provider="Sqlite"
 ENV EROSTTS_Database__ConnectionString="Data Source=data/erostts.db"
 

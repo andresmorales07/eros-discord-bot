@@ -82,7 +82,12 @@ A Discord bot that converts text to speech using the Eleven Labs API and plays i
     "MaxTokens": 500,
     "Temperature": 0.8,
     "TimeoutSeconds": 60,
-    "MaxHistoryMessages": 20
+    "MaxHistoryMessages": 20,
+    "DefaultSystemPrompt": "Keep responses concise (under 2 sentences). Respond in character."
+  },
+  "Database": {
+    "Provider": "InMemory",
+    "ConnectionString": "Data Source=data/erostts.db"
   }
 }
 ```
@@ -99,6 +104,9 @@ A Discord bot that converts text to speech using the Eleven Labs API and plays i
 | `OpenRouter:MaxTokens` | Maximum tokens in AI response | `500` |
 | `OpenRouter:Temperature` | Response randomness (0.0-2.0) | `0.8` |
 | `OpenRouter:MaxHistoryMessages` | Conversation history limit | `20` |
+| `OpenRouter:DefaultSystemPrompt` | Default system prompt prepended to all AI requests | *(empty)* |
+| `Database:Provider` | Database provider: `InMemory`, `Sqlite`, or `Postgres` | `InMemory` |
+| `Database:ConnectionString` | Database connection string (ignored for InMemory) | `Data Source=data/erostts.db` |
 
 ## Running Locally
 
@@ -132,47 +140,99 @@ A Discord bot that converts text to speech using the Eleven Labs API and plays i
 
 ## Running with Docker
 
-1. Copy the example environment file:
-   ```bash
-   cp docker/.env.example docker/.env
+The bot image is published to GitHub Container Registry at `ghcr.io/andresmorales07/eros-discord-bot`.
+
+### Docker Compose (Recommended)
+
+1. Create a `docker-compose.yml`:
+
+   ```yaml
+   services:
+     eros-discord-bot:
+       container_name: eros-discord-bot
+       volumes:
+         - data:/app/data
+         - logs:/app/logs
+       restart: unless-stopped
+       logging:
+         driver: "json-file"
+         options:
+           max-size: "10m"
+           max-file: "3"
+       image: ghcr.io/andresmorales07/eros-discord-bot:latest
+       environment:
+         - EROSTTS_Discord__Token=${DISCORD_TOKEN}
+         - EROSTTS_ElevenLabs__ApiKey=${ELEVENLABS_API_KEY}
+         # Required for AI features
+         - EROSTTS_OpenRouter__ApiKey=${OPENROUTER_API_KEY}
+         # Optional
+         - EROSTTS_ElevenLabs__VoiceId=${ELEVENLABS_VOICE_ID:-21m00Tcm4TlvDq8ikWAM}
+         - EROSTTS_OpenRouter__Model=${OPENROUTER_MODEL:-anthropic/claude-3.5-sonnet}
+         - EROSTTS_OpenRouter__DefaultSystemPrompt=${OPENROUTER_DEFAULT_SYSTEM_PROMPT:-}
+         - EROSTTS_Database__Provider=${DATABASE_PROVIDER:-Sqlite}
+         - EROSTTS_Database__ConnectionString=${DATABASE_CONNECTION_STRING:-Data Source=data/erostts.db}
+
+   volumes:
+     logs:
+       name: eros-discord-bot-logs
+     data:
+       name: eros-discord-bot-data
    ```
 
-2. Edit `docker/.env` with your tokens:
+2. Create a `.env` file in the same directory:
+
    ```env
+   # Required
    DISCORD_TOKEN=your_discord_bot_token
    ELEVENLABS_API_KEY=your_elevenlabs_api_key
+
+   # Required for AI features (optional if not using /prompt)
+   OPENROUTER_API_KEY=your_openrouter_api_key
+
+   # Optional overrides
+   # ELEVENLABS_VOICE_ID=21m00Tcm4TlvDq8ikWAM
+   # OPENROUTER_MODEL=anthropic/claude-3.5-sonnet
+   # OPENROUTER_DEFAULT_SYSTEM_PROMPT=Keep responses concise. Respond in character.
+   # DATABASE_PROVIDER=Sqlite
+   # DATABASE_CONNECTION_STRING=Data Source=data/erostts.db
    ```
 
-3. Build and run:
+3. Run:
    ```bash
-   cd docker
-   docker-compose up -d
+   docker compose up -d
    ```
 
 4. View logs:
    ```bash
-   docker-compose logs -f
+   docker compose logs -f
    ```
 
-### Docker Commands
+### Docker Run
 
 ```bash
-# Build the image
-docker build -f docker/Dockerfile -t erostts-bot .
-
-# Run directly
 docker run -d \
-  -e EROSTTS_Discord__Token=your_token \
-  -e EROSTTS_ElevenLabs__ApiKey=your_key \
-  -v ./logs:/app/logs \
-  --name erostts \
-  erostts-bot
+  --name eros-discord-bot \
+  -e EROSTTS_Discord__Token=your_discord_token \
+  -e EROSTTS_ElevenLabs__ApiKey=your_elevenlabs_key \
+  -v erostts-data:/app/data \
+  -v erostts-logs:/app/logs \
+  ghcr.io/andresmorales07/eros-discord-bot:latest
+```
 
-# Stop
-docker stop erostts
+### Building from Source
 
-# View logs
-docker logs -f erostts
+```bash
+# Build the image locally
+docker build -f docker/Dockerfile -t eros-discord-bot .
+
+# Run the locally built image
+docker run -d \
+  --name eros-discord-bot \
+  -e EROSTTS_Discord__Token=your_discord_token \
+  -e EROSTTS_ElevenLabs__ApiKey=your_elevenlabs_key \
+  -v erostts-data:/app/data \
+  -v erostts-logs:/app/logs \
+  eros-discord-bot
 ```
 
 ## Slash Commands
@@ -273,18 +333,26 @@ If you want the bot to automatically read messages from a text channel (legacy b
 
 ```
 ErosTTS.Bot/
-├── Configuration/          # Configuration classes
+├── Commands/              # Slash commands (TtsCommands, CharacterCommands)
+├── Configuration/         # Options pattern config classes
+├── Data/                  # EF Core persistence layer
+│   ├── Converters/        # Discord ID ulong<->long converter
+│   ├── Entities/          # EF entity classes
+│   ├── Migrations/        # EF Core migrations
+│   ├── ErosTtsDbContext.cs
+│   └── DesignTimeDbContextFactory.cs
+├── Exceptions/            # Custom exception types (TTS, LLM)
+├── Extensions/            # DI registration extensions
+├── HostedServices/        # Background services (queue processor, gateway events)
 ├── Services/
 │   ├── Audio/             # Discord voice playback
-│   ├── Character/         # Per-guild AI character state (context, conversation history)
-│   ├── Guild/             # Per-guild TTS configuration
+│   ├── Character/         # Per-guild AI character state (in-memory + EF implementations)
+│   ├── Guild/             # Per-guild TTS configuration (in-memory + EF implementations)
 │   ├── LLM/               # OpenRouter API client for AI responses
 │   ├── Queue/             # Message queue (System.Threading.Channels)
 │   └── TTS/               # Eleven Labs API client
-├── Commands/              # Slash commands (TtsCommands, CharacterCommands)
-├── HostedServices/        # Background services (queue processor, gateway events)
-├── Utilities/             # Shared utilities (text sanitization)
-└── Exceptions/            # Custom exceptions (TTS, LLM)
+├── Utilities/             # Text sanitization utilities
+└── Program.cs             # Host builder and DI configuration
 ```
 
 ## Troubleshooting

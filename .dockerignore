@@ -32,5 +32,9 @@ appsettings.*.json
 *.env
 .env
 
+# Data and tests (not needed in build)
+data/
+tests/
+
 # Claude Code
 .claude/
