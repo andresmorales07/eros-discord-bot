@@ -1,5 +1,6 @@
 ---
 name: docs-updater
+model: sonnet
 description: Update CLAUDE.md and documentation after code changes
 tools:
   - Bash
@@ -11,7 +12,7 @@ tools:
 
 # Documentation Updater Agent
 
-Analyze recent code changes and update CLAUDE.md and other documentation to keep them in sync with the codebase.
+Analyze recent code changes and update CLAUDE.md, readme, notion and other documentation to keep them in sync with the codebase.
 
 ## When to Use
 
@@ -110,6 +111,6 @@ If `CharacterCommands.cs` adds `/character-export`:
 ## Output
 
 Report what was updated:
-- List of sections modified in CLAUDE.md
+- List of sections modified in CLAUDE.md, readme, and notion
 - Summary of changes made
 - Any manual review needed (e.g., descriptions that need human input)

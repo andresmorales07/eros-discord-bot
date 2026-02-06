@@ -121,10 +121,11 @@ src/ErosTTS.Bot/
 ├── Exceptions/            # Custom exception types (TtsExceptions, LlmExceptions)
 ├── Extensions/            # DI registration extensions (DatabaseServiceExtensions)
 ├── HostedServices/        # Background services
-│   ├── GatewayEventHostedService.cs  # Discord event handlers
-│   └── TtsProcessorService.cs        # Queue processor
+│   ├── GatewayEventHostedService.cs     # Discord event handlers
+│   ├── TtsProcessorService.cs           # Queue processor
+│   └── VoiceInactivityHostedService.cs  # Auto-disconnect from empty voice channels
 ├── Services/
-│   ├── Audio/             # Discord voice playback (AudioService)
+│   ├── Audio/             # Discord voice playback (AudioService, VoiceChannelInspector)
 │   ├── Character/         # Per-guild character state (in-memory + EF implementations)
 │   ├── Guild/             # Per-guild configuration storage (in-memory + EF implementations)
 │   ├── LLM/               # OpenRouter API client for AI responses
@@ -181,6 +182,9 @@ All commands respond with ephemeral messages (only visible to the user) except `
 
 - Bot joins voice channels **self-deafened** by default (doesn't listen to voice chat)
 - Uses `UpdateVoiceStateAsync` with `SelfDeaf = true` after connecting
+- **Auto-disconnect**: Bot automatically disconnects after 60 seconds when alone in a voice channel (no human users present)
+  - Monitored by `VoiceInactivityHostedService` listening to voice state updates
+  - Timer is cancelled if users rejoin before the delay expires
 
 ## External Dependencies
 

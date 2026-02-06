@@ -9,6 +9,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="ErosTTS.Bot.Tests" />
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Discord (NetCord) -->
     <PackageReference Include="NetCord" Version="1.0.0-alpha.460" />
     <PackageReference Include="NetCord.Services" Version="1.0.0-alpha.460" />

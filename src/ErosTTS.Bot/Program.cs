@@ -107,8 +107,12 @@ try
             // Persistence (guild config + character state) — provider-driven
             services.AddPersistence(context.Configuration);
 
+            // Voice channel inspector (used by inactivity monitor)
+            services.AddSingleton<IVoiceChannelInspector, VoiceChannelInspector>();
+
             // Gateway event handlers (registered as hosted services)
             services.AddHostedService<GatewayEventHostedService>();
+            services.AddHostedService<VoiceInactivityHostedService>();
 
             // Hosted Services
             services.AddHostedService<TtsProcessorService>();
