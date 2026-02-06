@@ -1,5 +1,3 @@
-using ErosTTS.Bot.Services.Character;
-
 namespace ErosTTS.Bot.Services.LLM;
 
 /// <summary>

@@ -1,6 +1,5 @@
 using ErosTTS.Bot.Configuration;
 using ErosTTS.Bot.Exceptions;
-using ErosTTS.Bot.Services.Character;
 using ErosTTS.Bot.Services.LLM;
 using ErosTTS.Bot.Tests.Fakes;
 

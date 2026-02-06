@@ -1,7 +1,7 @@
 using ErosTTS.Bot.Configuration;
 using ErosTTS.Bot.Data;
-using ErosTTS.Bot.Services.Character;
 using ErosTTS.Bot.Services.Guild;
+using ErosTTS.Bot.Services.Npc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,7 +14,7 @@ namespace ErosTTS.Bot.Extensions;
 public static class DatabaseServiceExtensions
 {
     /// <summary>
-    /// Registers guild configuration and character state services based on the configured database provider.
+    /// Registers guild configuration and NPC services based on the configured database provider.
     /// </summary>
     public static IServiceCollection AddPersistence(
         this IServiceCollection services,
@@ -29,7 +29,7 @@ public static class DatabaseServiceExtensions
                 services.AddDbContextFactory<ErosTtsDbContext>(options =>
                     options.UseSqlite(dbConfig.ConnectionString));
                 services.AddSingleton<IGuildConfigurationService, EfGuildConfigurationService>();
-                services.AddSingleton<ICharacterStateService, EfCharacterStateService>();
+                services.AddSingleton<INpcService, EfNpcService>();
                 break;
 
             case "postgres":
@@ -42,7 +42,7 @@ public static class DatabaseServiceExtensions
             case "inmemory":
             default:
                 services.AddSingleton<IGuildConfigurationService, GuildConfigurationService>();
-                services.AddSingleton<ICharacterStateService, CharacterStateService>();
+                services.AddSingleton<INpcService, NpcService>();
                 break;
         }
 

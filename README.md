@@ -1,17 +1,20 @@
 # ErosTTS Discord Bot
 
-A Discord bot that converts text to speech using the Eleven Labs API and plays it in Discord voice channels. Also supports **AI-powered character roleplaying** for D&D sessions and similar scenarios.
+A Discord bot that converts text to speech using the Eleven Labs API and plays it in Discord voice channels. Also supports **AI-powered multi-NPC roleplaying** for D&D sessions and similar scenarios.
 
 ## Features
 
 - **Slash command TTS** - Use `/say` to speak text in voice channels
-- **AI Character Roleplaying** - Set character context and prompt an AI to respond in character via TTS
+- **Multi-NPC Roleplaying** - Create multiple named NPCs with individual personalities, voices, and conversation histories
+- **Auto-switch** - LLM-driven NPC selection automatically picks the best character to respond
+- **Per-NPC voices** - Each NPC can have its own ElevenLabs voice ID
+- **Import/Export** - Share NPC configurations between guilds via JSON
 - **Privacy-focused** - Bot joins voice channels self-deafened and command responses are ephemeral (except `/prompt`)
 - Converts text to speech using Eleven Labs TTS API
 - AI responses powered by OpenRouter (supports Claude, GPT, and other models)
 - Automatic voice channel detection (joins your current voice channel)
 - Message queue system for ordered, conflict-free playback
-- Per-guild character state with conversation history
+- Shared or per-NPC conversation history modes
 - Optional text channel monitoring mode (legacy behavior)
 - Docker support for easy deployment
 - Comprehensive logging with Serilog
@@ -85,6 +88,11 @@ A Discord bot that converts text to speech using the Eleven Labs API and plays i
     "MaxHistoryMessages": 20,
     "DefaultSystemPrompt": "Keep responses concise (under 2 sentences). Respond in character."
   },
+  "Npc": {
+    "MaxNpcsPerGuild": 20,
+    "MaxHistoryMessages": 50,
+    "AutoSwitchContextMessages": 5
+  },
   "Database": {
     "Provider": "InMemory",
     "ConnectionString": "Data Source=data/erostts.db"
@@ -105,6 +113,9 @@ A Discord bot that converts text to speech using the Eleven Labs API and plays i
 | `OpenRouter:Temperature` | Response randomness (0.0-2.0) | `0.8` |
 | `OpenRouter:MaxHistoryMessages` | Conversation history limit | `20` |
 | `OpenRouter:DefaultSystemPrompt` | Default system prompt prepended to all AI requests | *(empty)* |
+| `Npc:MaxNpcsPerGuild` | Maximum NPCs allowed per guild | `20` |
+| `Npc:MaxHistoryMessages` | Max conversation history messages per NPC/guild | `50` |
+| `Npc:AutoSwitchContextMessages` | Recent messages included for auto-switch context | `5` |
 | `Database:Provider` | Database provider: `InMemory`, `Sqlite`, or `Postgres` | `InMemory` |
 | `Database:ConnectionString` | Database connection string (ignored for InMemory) | `Data Source=data/erostts.db` |
 
@@ -249,14 +260,22 @@ All command responses are **ephemeral** (only visible to the user who ran the co
 | `/tts-status` | Show current configuration, mode, and voice ID | Everyone | Ephemeral |
 | `/tts-clear` | Remove TTS configuration | Manage Guild | Ephemeral |
 
-### AI Character Commands
+### NPC Commands
 
 | Command | Description | Visibility |
 |---------|-------------|------------|
-| `/character-context <context> [append]` | Set or append character context/system prompt | Ephemeral |
-| `/prompt <message>` | Send a prompt to the AI character (response via TTS) | **Public** |
-| `/character-clear` | Clear character context and conversation history | Ephemeral |
-| `/character-status` | View current character state | Ephemeral |
+| `/npc-create <name> <personality> [voice-id]` | Create a new NPC | Ephemeral |
+| `/npc-edit <name> [new-name] [personality] [voice-id] [clear-voice]` | Edit an existing NPC | Ephemeral |
+| `/npc-delete <name>` | Delete an NPC and its history | Ephemeral |
+| `/npc-list` | List all NPCs in the guild | Ephemeral |
+| `/npc-select <name>` | Set the active NPC | Ephemeral |
+| `/npc-auto-switch` | Toggle LLM-driven NPC selection | Ephemeral |
+| `/npc-history-mode <shared>` | Toggle shared/per-NPC history (clears history) | Ephemeral |
+| `/npc-clear-history [name]` | Clear history (one NPC or all) | Ephemeral |
+| `/npc-status` | Show NPC settings and counts | Ephemeral |
+| `/npc-import <json>` | Import NPCs from JSON | Ephemeral |
+| `/npc-export` | Export all NPCs as JSON | Ephemeral |
+| `/prompt <message>` | Send prompt to AI NPC; response played via TTS | **Public** |
 
 ## Usage
 
@@ -285,37 +304,46 @@ Each Discord server can use a different ElevenLabs voice. Use `/tts-setup` with 
 
 You can find voice IDs in your [ElevenLabs Voice Library](https://elevenlabs.io/voice-library). If no `voice-id` is specified, the default voice from your configuration is used.
 
-### AI Character Roleplaying
+### Multi-NPC Roleplaying
 
-The bot can play characters in D&D sessions or other roleplaying scenarios:
+The bot supports multiple named NPCs per guild, each with their own personality, voice, and conversation history — perfect for D&D sessions:
 
 1. Configure a default voice channel with `/tts-setup`:
    ```
    /tts-setup voice-channel:General
    ```
 
-2. Set up the character context (system prompt):
+2. Create NPCs with unique personalities and optional voice IDs:
    ```
-   /character-context context:You are Gandalf, a wise wizard. Speak in a mystical, cryptic manner. You are helping a group of adventurers on their quest.
-   ```
-
-3. Add more context as the story progresses:
-   ```
-   /character-context context:The party has just defeated a dragon and found a magical artifact. append:true
+   /npc-create name:Gandalf personality:You are Gandalf the Grey, a wise and cryptic wizard. voice-id:EXAVITQu4vr4xnSDxMaL
+   /npc-create name:Saruman personality:You are Saruman the White, a cunning and power-hungry wizard.
    ```
 
-4. Prompt the character and hear the response:
+3. Select the active NPC or enable auto-switch:
+   ```
+   /npc-select name:Gandalf
+   ```
+   Or let the LLM choose the best NPC automatically:
+   ```
+   /npc-auto-switch
+   ```
+
+4. Prompt the NPC and hear the response (each NPC uses its own voice):
    ```
    /prompt message:Gandalf, what should we do with this artifact?
    ```
-   The AI will respond in character, and the response will be spoken via TTS in the voice channel.
 
-5. When switching characters, clear the state:
+5. Switch between shared and per-NPC conversation history:
    ```
-   /character-clear
+   /npc-history-mode shared:true
    ```
 
-**Note:** The `/prompt` command response is visible to everyone in the channel, showing both the user's message and the character's response.
+6. Export NPCs to share with other guilds:
+   ```
+   /npc-export
+   ```
+
+**Note:** The `/prompt` command response is visible to everyone in the channel, showing the user's message and the NPC's response.
 
 ### Optional: Text Channel Monitoring Mode
 
@@ -333,11 +361,11 @@ If you want the bot to automatically read messages from a text channel (legacy b
 
 ```
 ErosTTS.Bot/
-├── Commands/              # Slash commands (TtsCommands, CharacterCommands)
+├── Commands/              # Slash commands (TtsCommands, NpcCommands)
 ├── Configuration/         # Options pattern config classes
 ├── Data/                  # EF Core persistence layer
 │   ├── Converters/        # Discord ID ulong<->long converter
-│   ├── Entities/          # EF entity classes
+│   ├── Entities/          # EF entity classes (NpcEntity, GuildNpcSettingsEntity, etc.)
 │   ├── Migrations/        # EF Core migrations
 │   ├── ErosTtsDbContext.cs
 │   └── DesignTimeDbContextFactory.cs
@@ -346,9 +374,9 @@ ErosTTS.Bot/
 ├── HostedServices/        # Background services (queue processor, gateway events)
 ├── Services/
 │   ├── Audio/             # Discord voice playback
-│   ├── Character/         # Per-guild AI character state (in-memory + EF implementations)
 │   ├── Guild/             # Per-guild TTS configuration (in-memory + EF implementations)
-│   ├── LLM/               # OpenRouter API client for AI responses
+│   ├── LLM/               # OpenRouter API client + ConversationMessage DTO
+│   ├── Npc/               # Multi-NPC system (CRUD, auto-switch, history, import/export)
 │   ├── Queue/             # Message queue (System.Threading.Channels)
 │   └── TTS/               # Eleven Labs API client
 ├── Utilities/             # Text sanitization utilities
@@ -385,8 +413,9 @@ ErosTTS.Bot/
 - Check Discord server region and latency
 - Ensure the bot isn't banned from the voice channel
 
-### AI character not responding
+### NPC not responding
 - Ensure `OpenRouter:ApiKey` is configured
+- Ensure at least one NPC has been created with `/npc-create`
 - Check that a voice channel is configured with `/tts-setup`
 - Review logs for API errors (rate limits, authentication failures)
 - Verify your OpenRouter account has credits available

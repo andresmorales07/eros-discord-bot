@@ -35,34 +35,104 @@ public class ErosTtsDbContextTests : EfTestBase
     }
 
     [Fact]
-    public async Task CascadeDelete_RemovesConversationMessages_WhenCharacterStateDeleted()
+    public async Task NpcEntity_CanBeInsertedAndRetrieved()
     {
         using var db = Factory.CreateDbContext();
-        var state = new GuildCharacterStateEntity
+        var npc = new NpcEntity
         {
             GuildId = 12345L,
-            Context = "Test",
-            UpdatedAt = DateTimeOffset.UtcNow,
-            ConversationHistory =
-            [
-                new() { GuildId = 12345L, Role = "user", Content = "Hello", Timestamp = DateTimeOffset.UtcNow },
-                new() { GuildId = 12345L, Role = "assistant", Content = "Hi", Timestamp = DateTimeOffset.UtcNow }
-            ]
+            Name = "Gandalf",
+            Personality = "A wise wizard",
+            VoiceId = "voice123",
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
         };
-        db.GuildCharacterStates.Add(state);
+        db.Npcs.Add(npc);
         await db.SaveChangesAsync();
 
-        // Verify messages exist
-        (await db.ConversationMessages.CountAsync()).Should().Be(2);
-
-        // Delete the parent
-        db.GuildCharacterStates.Remove(state);
-        await db.SaveChangesAsync();
-
-        // Verify cascade delete removed messages
         using var db2 = Factory.CreateDbContext();
-        (await db2.ConversationMessages.CountAsync()).Should().Be(0);
-        (await db2.GuildCharacterStates.CountAsync()).Should().Be(0);
+        var retrieved = await db2.Npcs.FirstOrDefaultAsync(n => n.GuildId == 12345L);
+        retrieved.Should().NotBeNull();
+        retrieved!.Name.Should().Be("Gandalf");
+        retrieved.Personality.Should().Be("A wise wizard");
+        retrieved.VoiceId.Should().Be("voice123");
+    }
+
+    [Fact]
+    public async Task NpcEntity_GuildIdNameUnique()
+    {
+        using var db = Factory.CreateDbContext();
+        db.Npcs.Add(new NpcEntity
+        {
+            GuildId = 12345L, Name = "Gandalf", Personality = "Wizard",
+            CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        using var db2 = Factory.CreateDbContext();
+        db2.Npcs.Add(new NpcEntity
+        {
+            GuildId = 12345L, Name = "Gandalf", Personality = "Another wizard",
+            CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        var act = async () => await db2.SaveChangesAsync();
+        await act.Should().ThrowAsync<DbUpdateException>();
+    }
+
+    [Fact]
+    public async Task NpcDelete_SetNullOnConversationMessages()
+    {
+        using var db = Factory.CreateDbContext();
+        var npc = new NpcEntity
+        {
+            GuildId = 12345L, Name = "Gandalf", Personality = "Wizard",
+            CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Npcs.Add(npc);
+        await db.SaveChangesAsync();
+
+        db.NpcConversationMessages.Add(new NpcConversationMessageEntity
+        {
+            GuildId = 12345L, NpcId = npc.Id, NpcName = "Gandalf",
+            Role = "user", Content = "Hello", Timestamp = DateTimeOffset.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        db.Npcs.Remove(npc);
+        await db.SaveChangesAsync();
+
+        using var db2 = Factory.CreateDbContext();
+        var messages = await db2.NpcConversationMessages.ToListAsync();
+        messages.Should().HaveCount(1);
+        messages[0].NpcId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GuildNpcSettings_ActiveNpcSetNull_OnNpcDelete()
+    {
+        using var db = Factory.CreateDbContext();
+        var npc = new NpcEntity
+        {
+            GuildId = 12345L, Name = "Gandalf", Personality = "Wizard",
+            CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Npcs.Add(npc);
+        await db.SaveChangesAsync();
+
+        db.GuildNpcSettings.Add(new GuildNpcSettingsEntity
+        {
+            GuildId = 12345L, ActiveNpcId = npc.Id, UpdatedAt = DateTimeOffset.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        db.Npcs.Remove(npc);
+        await db.SaveChangesAsync();
+
+        using var db2 = Factory.CreateDbContext();
+        var settings = await db2.GuildNpcSettings.FindAsync(12345L);
+        settings.Should().NotBeNull();
+        settings!.ActiveNpcId.Should().BeNull();
     }
 
     [Fact]
@@ -87,26 +157,26 @@ public class ErosTtsDbContextTests : EfTestBase
     }
 
     [Fact]
-    public async Task ConversationMessages_OrderedById()
+    public async Task NpcConversationMessages_OrderedById()
     {
         using var db = Factory.CreateDbContext();
-        var state = new GuildCharacterStateEntity
+        var npc = new NpcEntity
         {
-            GuildId = 12345L,
-            Context = "Test",
-            UpdatedAt = DateTimeOffset.UtcNow,
-            ConversationHistory =
-            [
-                new() { GuildId = 12345L, Role = "user", Content = "First", Timestamp = DateTimeOffset.UtcNow },
-                new() { GuildId = 12345L, Role = "assistant", Content = "Second", Timestamp = DateTimeOffset.UtcNow },
-                new() { GuildId = 12345L, Role = "user", Content = "Third", Timestamp = DateTimeOffset.UtcNow }
-            ]
+            GuildId = 12345L, Name = "Gandalf", Personality = "Wizard",
+            CreatedAt = DateTimeOffset.UtcNow, UpdatedAt = DateTimeOffset.UtcNow
         };
-        db.GuildCharacterStates.Add(state);
+        db.Npcs.Add(npc);
+        await db.SaveChangesAsync();
+
+        db.NpcConversationMessages.AddRange(
+            new NpcConversationMessageEntity { GuildId = 12345L, NpcId = npc.Id, NpcName = "Gandalf", Role = "user", Content = "First", Timestamp = DateTimeOffset.UtcNow },
+            new NpcConversationMessageEntity { GuildId = 12345L, NpcId = npc.Id, NpcName = "Gandalf", Role = "assistant", Content = "Second", Timestamp = DateTimeOffset.UtcNow },
+            new NpcConversationMessageEntity { GuildId = 12345L, NpcId = npc.Id, NpcName = "Gandalf", Role = "user", Content = "Third", Timestamp = DateTimeOffset.UtcNow }
+        );
         await db.SaveChangesAsync();
 
         using var db2 = Factory.CreateDbContext();
-        var messages = await db2.ConversationMessages
+        var messages = await db2.NpcConversationMessages
             .Where(m => m.GuildId == 12345L)
             .OrderBy(m => m.Id)
             .ToListAsync();

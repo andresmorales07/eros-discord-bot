@@ -9,8 +9,9 @@ namespace ErosTTS.Bot.Data;
 public sealed class ErosTtsDbContext : DbContext
 {
     public DbSet<GuildTtsConfigurationEntity> GuildConfigurations => Set<GuildTtsConfigurationEntity>();
-    public DbSet<GuildCharacterStateEntity> GuildCharacterStates => Set<GuildCharacterStateEntity>();
-    public DbSet<ConversationMessageEntity> ConversationMessages => Set<ConversationMessageEntity>();
+    public DbSet<NpcEntity> Npcs => Set<NpcEntity>();
+    public DbSet<GuildNpcSettingsEntity> GuildNpcSettings => Set<GuildNpcSettingsEntity>();
+    public DbSet<NpcConversationMessageEntity> NpcConversationMessages => Set<NpcConversationMessageEntity>();
 
     public ErosTtsDbContext(DbContextOptions<ErosTtsDbContext> options) : base(options) { }
 
@@ -24,24 +25,40 @@ public sealed class ErosTtsDbContext : DbContext
             entity.Property(e => e.VoiceId).HasMaxLength(100);
         });
 
-        modelBuilder.Entity<GuildCharacterStateEntity>(entity =>
+        modelBuilder.Entity<NpcEntity>(entity =>
         {
-            entity.ToTable("GuildCharacterStates");
-            entity.HasKey(e => e.GuildId);
-            entity.Property(e => e.GuildId).ValueGeneratedNever();
-            entity.HasMany(e => e.ConversationHistory)
-                  .WithOne(e => e.GuildCharacterState)
-                  .HasForeignKey(e => e.GuildId)
-                  .OnDelete(DeleteBehavior.Cascade);
+            entity.ToTable("Npcs");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).ValueGeneratedOnAdd();
+            entity.Property(e => e.Name).HasMaxLength(100);
+            entity.Property(e => e.VoiceId).HasMaxLength(100);
+            entity.HasIndex(e => new { e.GuildId, e.Name }).IsUnique();
+            entity.HasMany(e => e.ConversationMessages)
+                  .WithOne(e => e.Npc)
+                  .HasForeignKey(e => e.NpcId)
+                  .OnDelete(DeleteBehavior.SetNull);
         });
 
-        modelBuilder.Entity<ConversationMessageEntity>(entity =>
+        modelBuilder.Entity<GuildNpcSettingsEntity>(entity =>
         {
-            entity.ToTable("ConversationMessages");
+            entity.ToTable("GuildNpcSettings");
+            entity.HasKey(e => e.GuildId);
+            entity.Property(e => e.GuildId).ValueGeneratedNever();
+            entity.HasOne(e => e.ActiveNpc)
+                  .WithMany()
+                  .HasForeignKey(e => e.ActiveNpcId)
+                  .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<NpcConversationMessageEntity>(entity =>
+        {
+            entity.ToTable("NpcConversationMessages");
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Id).ValueGeneratedOnAdd();
             entity.Property(e => e.Role).HasMaxLength(20);
+            entity.Property(e => e.NpcName).HasMaxLength(100);
             entity.HasIndex(e => e.GuildId);
+            entity.HasIndex(e => e.NpcId);
         });
     }
 }

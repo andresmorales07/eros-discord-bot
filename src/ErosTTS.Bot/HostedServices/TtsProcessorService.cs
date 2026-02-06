@@ -129,13 +129,14 @@ public sealed class TtsProcessorService : BackgroundService
             return;
         }
 
-        // Generate TTS audio
+        // Generate TTS audio — NPC voice overrides guild voice
         Stream? audioStream = null;
         try
         {
+            var voiceId = item.VoiceId ?? config.VoiceId;
             _logger.LogDebug("Generating TTS audio for {CharCount} characters using voice {VoiceId}",
-                item.Text.Length, config.VoiceId ?? "(default)");
-            audioStream = await _ttsService.SynthesizeAsync(item.Text, config.VoiceId, ct);
+                item.Text.Length, voiceId ?? "(default)");
+            audioStream = await _ttsService.SynthesizeAsync(item.Text, voiceId, ct);
 
             // Play the audio
             _logger.LogDebug("Playing audio in voice channel {ChannelId}", item.VoiceChannelId);

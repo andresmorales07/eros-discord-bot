@@ -36,6 +36,11 @@ public sealed record TtsQueueItem
     public required string Username { get; init; }
 
     /// <summary>
+    /// Optional voice ID override (e.g. from NPC). Null means use guild or global default.
+    /// </summary>
+    public string? VoiceId { get; init; }
+
+    /// <summary>
     /// When the item was added to the queue.
     /// </summary>
     public DateTimeOffset QueuedAt { get; init; } = DateTimeOffset.UtcNow;

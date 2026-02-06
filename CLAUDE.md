@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ErosTTS is a Discord bot that converts text to speech using the Eleven Labs API and plays audio in Discord voice channels. Built with .NET 10, it uses NetCord for Discord integration and supports both slash commands and optional text channel monitoring.
 
-The bot also supports **AI-powered character roleplaying** using OpenRouter API, allowing it to play characters in D&D sessions or similar roleplaying scenarios.
+The bot also supports **AI-powered multi-NPC roleplaying** using OpenRouter API, allowing it to play multiple named characters (NPCs) in D&D sessions or similar roleplaying scenarios. Each NPC has its own personality, optional voice, and conversation history.
 
 ## Build & Run Commands
 
@@ -54,6 +54,9 @@ cd docker && docker-compose up -d
 | `EROSTTS_Discord__EnableTextChannelMonitoring` | `false` | Monitor text channels (requires Message Content Intent) |
 | `EROSTTS_Discord__MaxMessageLength` | `500` | Max TTS message length |
 | `EROSTTS_Voice__FFmpegPath` | `ffmpeg` | Path to FFmpeg binary |
+| `EROSTTS_Npc__MaxNpcsPerGuild` | `20` | Maximum NPCs per guild |
+| `EROSTTS_Npc__MaxHistoryMessages` | `50` | Maximum conversation history messages |
+| `EROSTTS_Npc__AutoSwitchContextMessages` | `5` | Recent messages for auto-switch context |
 | `EROSTTS_Database__Provider` | `InMemory` | Database provider: `InMemory`, `Sqlite`, or `Postgres` |
 | `EROSTTS_Database__ConnectionString` | `Data Source=data/erostts.db` | Database connection string (ignored for InMemory) |
 
@@ -110,11 +113,11 @@ cd docker && docker-compose up -d
 
 ```
 src/ErosTTS.Bot/
-├── Commands/              # Slash commands (TtsCommands.cs, CharacterCommands.cs)
+├── Commands/              # Slash commands (TtsCommands.cs, NpcCommands.cs)
 ├── Configuration/         # Options pattern config classes
 ├── Data/                  # EF Core persistence layer
 │   ├── Converters/        # Discord ID ulong<->long converter
-│   ├── Entities/          # EF entity classes
+│   ├── Entities/          # EF entity classes (NpcEntity, GuildNpcSettingsEntity, etc.)
 │   ├── Migrations/        # EF Core migrations
 │   ├── ErosTtsDbContext.cs
 │   └── DesignTimeDbContextFactory.cs
@@ -126,9 +129,9 @@ src/ErosTTS.Bot/
 │   └── VoiceInactivityHostedService.cs  # Auto-disconnect from empty voice channels
 ├── Services/
 │   ├── Audio/             # Discord voice playback (AudioService, VoiceChannelInspector)
-│   ├── Character/         # Per-guild character state (in-memory + EF implementations)
 │   ├── Guild/             # Per-guild configuration storage (in-memory + EF implementations)
-│   ├── LLM/               # OpenRouter API client for AI responses
+│   ├── LLM/               # OpenRouter API client + ConversationMessage DTO
+│   ├── Npc/               # Multi-NPC system (INpcService, INpcSelectionService, domain records)
 │   ├── Queue/             # TTS message queue (System.Threading.Channels)
 │   └── TTS/               # Eleven Labs API client
 ├── Utilities/             # Text sanitization utilities
@@ -144,7 +147,7 @@ src/ErosTTS.Bot/
 - **Serilog** - Structured logging to console and rolling files
 - **System.Threading.Channels** - Async message queue
 - **OpusDotNet** - Audio codec for Discord voice
-- **Entity Framework Core** (SQLite) - Database persistence for guild configuration and character state
+- **Entity Framework Core** (SQLite) - Database persistence for guild configuration and NPC state
 
 ## Code Patterns
 
@@ -172,11 +175,19 @@ All commands respond with ephemeral messages (only visible to the user) except `
 - `/tts-status` - Show current configuration (including voice ID)
 - `/tts-clear` - Remove configuration (Manage Guild permission)
 
-### AI Character Commands
-- `/character-context <context> [append]` - Set or append character context/system prompt (ephemeral)
-- `/prompt <message>` - Send a prompt to the AI character, response played via TTS (**public** - visible to all)
-- `/character-clear` - Clear character context and conversation history (ephemeral)
-- `/character-status` - View current character state (ephemeral)
+### NPC Commands (all ephemeral except `/prompt`)
+- `/npc-create <name> <personality> [voice-id]` - Create a new NPC
+- `/npc-edit <name> [new-name] [personality] [voice-id] [clear-voice]` - Edit NPC fields
+- `/npc-delete <name>` - Delete NPC + its history
+- `/npc-list` - List all NPCs with preview
+- `/npc-select <name>` - Set active NPC
+- `/npc-auto-switch` - Toggle LLM-driven NPC selection on/off
+- `/npc-history-mode <shared>` - Toggle shared/per-NPC history (clears history on change)
+- `/npc-clear-history [name]` - Clear history (one NPC or all)
+- `/npc-status` - Show settings, active NPC, counts
+- `/npc-import <json>` - Import NPCs from JSON
+- `/npc-export` - Export all NPCs as JSON code block
+- `/prompt <message>` - Send prompt; auto-switch or active NPC responds; TTS with NPC voice (**public**)
 
 ## Voice Channel Behavior
 

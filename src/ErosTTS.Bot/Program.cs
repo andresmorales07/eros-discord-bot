@@ -5,6 +5,7 @@ using ErosTTS.Bot.HostedServices;
 using ErosTTS.Bot.Services.Audio;
 using ErosTTS.Bot.Services.LLM;
 using ErosTTS.Bot.Services.Queue;
+using ErosTTS.Bot.Services.Npc;
 using ErosTTS.Bot.Services.TTS;
 using ErosTTS.Bot.Commands;
 using Microsoft.EntityFrameworkCore;
@@ -91,6 +92,8 @@ try
                 context.Configuration.GetSection(OpenRouterConfiguration.SectionName));
             services.Configure<DatabaseConfiguration>(
                 context.Configuration.GetSection(DatabaseConfiguration.SectionName));
+            services.Configure<NpcConfiguration>(
+                context.Configuration.GetSection(NpcConfiguration.SectionName));
 
             // HTTP Client for Eleven Labs with retry policy
             services.AddHttpClient<ITtsService, ElevenLabsTtsService>()
@@ -104,8 +107,11 @@ try
             services.AddSingleton<ITtsQueue, TtsQueue>();
             services.AddSingleton<IAudioService, AudioService>();
 
-            // Persistence (guild config + character state) — provider-driven
+            // Persistence (guild config + NPC state) — provider-driven
             services.AddPersistence(context.Configuration);
+
+            // NPC selection service (auto-switch)
+            services.AddSingleton<INpcSelectionService, NpcSelectionService>();
 
             // Voice channel inspector (used by inactivity monitor)
             services.AddSingleton<IVoiceChannelInspector, VoiceChannelInspector>();
@@ -147,7 +153,7 @@ try
 
     // Add slash command modules
     host.AddApplicationCommandModule<TtsCommands>();
-    host.AddApplicationCommandModule<CharacterCommands>();
+    host.AddApplicationCommandModule<NpcCommands>();
 
     await host.RunAsync();
 }
