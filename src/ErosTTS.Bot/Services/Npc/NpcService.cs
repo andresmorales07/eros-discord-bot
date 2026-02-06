@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using ErosTTS.Bot.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -27,8 +26,6 @@ public sealed class NpcService : INpcService
 
     private GuildState GetOrCreateGuild(ulong guildId) =>
         _guilds.GetOrAdd(guildId, id => new GuildState(id));
-
-    // NPC CRUD
 
     public Task<NpcDefinition> CreateNpcAsync(ulong guildId, string name, string personality, string? voiceId = null)
     {
@@ -167,8 +164,6 @@ public sealed class NpcService : INpcService
         }
     }
 
-    // Guild NPC Settings
-
     public Task<GuildNpcSettings> GetSettingsAsync(ulong guildId)
     {
         var guild = GetOrCreateGuild(guildId);
@@ -232,8 +227,6 @@ public sealed class NpcService : INpcService
         }
     }
 
-    // Conversation History
-
     public Task AddMessageAsync(ulong guildId, int? npcId, string? npcName, string role, string content)
     {
         var guild = GetOrCreateGuild(guildId);
@@ -286,11 +279,9 @@ public sealed class NpcService : INpcService
         return Task.CompletedTask;
     }
 
-    // Import/Export
-
     public Task<ImportResult> ImportNpcsAsync(ulong guildId, string json)
     {
-        var data = JsonSerializer.Deserialize<NpcExportData>(json, JsonOptions)
+        var data = JsonSerializer.Deserialize<NpcExportData>(json, NpcJsonOptions.Default)
             ?? throw new InvalidOperationException("Invalid JSON format.");
 
         if (data.Version != 1)
@@ -347,7 +338,7 @@ public sealed class NpcService : INpcService
     public Task<string> ExportNpcsAsync(ulong guildId)
     {
         if (!_guilds.TryGetValue(guildId, out var guild))
-            return Task.FromResult(JsonSerializer.Serialize(new NpcExportData { Version = 1, Npcs = [] }, JsonOptions));
+            return Task.FromResult(JsonSerializer.Serialize(new NpcExportData { Version = 1, Npcs = [] }, NpcJsonOptions.Default));
 
         lock (guild)
         {
@@ -364,7 +355,7 @@ public sealed class NpcService : INpcService
                     })
                     .ToList()
             };
-            return Task.FromResult(JsonSerializer.Serialize(data, JsonOptions));
+            return Task.FromResult(JsonSerializer.Serialize(data, NpcJsonOptions.Default));
         }
     }
 
@@ -389,13 +380,6 @@ public sealed class NpcService : INpcService
         }
     }
 
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        WriteIndented = true
-    };
-
     private sealed class GuildState
     {
         public GuildState(ulong guildId)
@@ -414,25 +398,4 @@ public sealed class NpcService : INpcService
         public List<NpcConversationMessage> Messages { get; } = [];
         public GuildNpcSettings Settings { get; set; }
     }
-}
-
-internal sealed class NpcExportData
-{
-    [JsonPropertyName("version")]
-    public int Version { get; set; }
-
-    [JsonPropertyName("npcs")]
-    public List<NpcExportItem> Npcs { get; set; } = [];
-}
-
-internal sealed class NpcExportItem
-{
-    [JsonPropertyName("name")]
-    public string Name { get; set; } = string.Empty;
-
-    [JsonPropertyName("personality")]
-    public string? Personality { get; set; }
-
-    [JsonPropertyName("voiceId")]
-    public string? VoiceId { get; set; }
 }

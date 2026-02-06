@@ -149,6 +149,12 @@ src/ErosTTS.Bot/
 - **OpusDotNet** - Audio codec for Discord voice
 - **Entity Framework Core** (SQLite) - Database persistence for guild configuration and NPC state
 
+## Agents
+
+- **docs-updater**: After making code changes that affect configuration, slash commands, project structure, dependencies, or code patterns, run the `docs-updater` agent to keep CLAUDE.md and other documentation in sync.
+- **dockerfile-verifier**: After making changes to `docker/Dockerfile`, `docker/docker-compose.yml`, configuration classes, environment variables, or runtime dependencies, run the `dockerfile-verifier` agent to verify Docker files stay correct and consistent.
+- **test-runner**: After making code changes, run the `test-runner` agent to execute the unit test suite and report results.
+
 ## Code Patterns
 
 - **Options pattern**: All configuration uses `IOptions<T>` with sections bound in `Program.cs`

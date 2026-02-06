@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using ErosTTS.Bot.Configuration;
 using ErosTTS.Bot.Data;
 using ErosTTS.Bot.Data.Converters;
@@ -28,8 +27,6 @@ public sealed class EfNpcService : INpcService
         _config = config.Value;
         _logger = logger;
     }
-
-    // NPC CRUD
 
     public async Task<NpcDefinition> CreateNpcAsync(ulong guildId, string name, string personality, string? voiceId = null)
     {
@@ -168,8 +165,6 @@ public sealed class EfNpcService : INpcService
         return await db.Npcs.CountAsync(n => n.GuildId == DiscordIdConverter.ToLong(guildId));
     }
 
-    // Guild NPC Settings
-
     public async Task<GuildNpcSettings> GetSettingsAsync(ulong guildId)
     {
         await using var db = await _factory.CreateDbContextAsync();
@@ -265,8 +260,6 @@ public sealed class EfNpcService : INpcService
         }
     }
 
-    // Conversation History
-
     public async Task AddMessageAsync(ulong guildId, int? npcId, string? npcName, string role, string content)
     {
         await using var db = await _factory.CreateDbContextAsync();
@@ -285,22 +278,7 @@ public sealed class EfNpcService : INpcService
         await db.SaveChangesAsync();
 
         // Trim history
-        var settings = await db.GuildNpcSettings
-            .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.GuildId == storedGuildId);
-
-        var isShared = settings?.SharedHistory ?? false;
-
-        IQueryable<NpcConversationMessageEntity> query;
-        if (isShared || npcId is null)
-        {
-            query = db.NpcConversationMessages.Where(m => m.GuildId == storedGuildId);
-        }
-        else
-        {
-            query = db.NpcConversationMessages.Where(m => m.NpcId == npcId);
-        }
-
+        var query = await BuildHistoryQueryAsync(db, storedGuildId, npcId);
         var count = await query.CountAsync();
         if (count > _config.MaxHistoryMessages)
         {
@@ -318,22 +296,7 @@ public sealed class EfNpcService : INpcService
         await using var db = await _factory.CreateDbContextAsync();
         var storedGuildId = DiscordIdConverter.ToLong(guildId);
 
-        var settings = await db.GuildNpcSettings
-            .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.GuildId == storedGuildId);
-
-        var isShared = settings?.SharedHistory ?? false;
-
-        IQueryable<NpcConversationMessageEntity> query;
-        if (isShared || npcId is null)
-        {
-            query = db.NpcConversationMessages.Where(m => m.GuildId == storedGuildId);
-        }
-        else
-        {
-            query = db.NpcConversationMessages.Where(m => m.NpcId == npcId);
-        }
-
+        var query = await BuildHistoryQueryAsync(db, storedGuildId, npcId);
         var entities = await query
             .AsNoTracking()
             .OrderBy(m => m.Id)
@@ -365,11 +328,9 @@ public sealed class EfNpcService : INpcService
         _logger.LogInformation("Cleared history for guild {GuildId}, npcId={NpcId}", guildId, npcId?.ToString() ?? "all");
     }
 
-    // Import/Export
-
     public async Task<ImportResult> ImportNpcsAsync(ulong guildId, string json)
     {
-        var data = JsonSerializer.Deserialize<NpcExportData>(json, JsonOptions)
+        var data = JsonSerializer.Deserialize<NpcExportData>(json, NpcJsonOptions.Default)
             ?? throw new InvalidOperationException("Invalid JSON format.");
 
         if (data.Version != 1)
@@ -451,7 +412,7 @@ public sealed class EfNpcService : INpcService
             }).ToList()
         };
 
-        return JsonSerializer.Serialize(data, JsonOptions);
+        return JsonSerializer.Serialize(data, NpcJsonOptions.Default);
     }
 
     private static async Task<GuildNpcSettingsEntity> GetOrCreateSettingsEntity(ErosTtsDbContext db, long storedGuildId)
@@ -469,6 +430,25 @@ public sealed class EfNpcService : INpcService
         return settings;
     }
 
+    /// <summary>
+    /// Builds the conversation message query based on guild history mode settings.
+    /// Shared mode (or null npcId) queries by guild; per-NPC mode queries by NPC ID.
+    /// </summary>
+    private static async Task<IQueryable<NpcConversationMessageEntity>> BuildHistoryQueryAsync(
+        ErosTtsDbContext db, long storedGuildId, int? npcId)
+    {
+        var settings = await db.GuildNpcSettings
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.GuildId == storedGuildId);
+
+        var isShared = settings?.SharedHistory ?? false;
+
+        if (isShared || npcId is null)
+            return db.NpcConversationMessages.Where(m => m.GuildId == storedGuildId);
+
+        return db.NpcConversationMessages.Where(m => m.NpcId == npcId);
+    }
+
     private static NpcDefinition MapToDomain(NpcEntity entity, ulong guildId) => new()
     {
         Id = entity.Id,
@@ -478,12 +458,5 @@ public sealed class EfNpcService : INpcService
         VoiceId = entity.VoiceId,
         CreatedAt = entity.CreatedAt,
         UpdatedAt = entity.UpdatedAt
-    };
-
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        WriteIndented = true
     };
 }

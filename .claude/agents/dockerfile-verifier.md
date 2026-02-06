@@ -1,5 +1,6 @@
 ---
 name: dockerfile-verifier
+model: sonnet
 description: Verify Dockerfile correctness, consistency with project config, and Docker best practices
 tools:
   - Bash

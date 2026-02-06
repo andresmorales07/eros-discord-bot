@@ -54,7 +54,22 @@ public sealed class NpcCommands : ApplicationCommandModule<ApplicationCommandCon
             Flags = MessageFlags.Ephemeral
         }));
 
-    private ulong? GetGuildId() => Context.Interaction.GuildId;
+    /// <summary>
+    /// Validates the interaction is in a guild. Returns false and sends an ephemeral
+    /// error response if not. Callers should return immediately when false is returned.
+    /// </summary>
+    private bool TryGetGuildId(out ulong guildId)
+    {
+        var id = Context.Interaction.GuildId;
+        if (id is not null)
+        {
+            guildId = id.Value;
+            return true;
+        }
+
+        guildId = default;
+        return false;
+    }
 
     [SlashCommand("npc-create", "Create a new NPC")]
     public async Task CreateNpcAsync(
@@ -65,8 +80,7 @@ public sealed class NpcCommands : ApplicationCommandModule<ApplicationCommandCon
         [SlashCommandParameter(Name = "voice-id", Description = "ElevenLabs voice ID override")]
         string? voiceId = null)
     {
-        var guildId = GetGuildId();
-        if (guildId is null)
+        if (!TryGetGuildId(out var guildId))
         {
             await RespondEphemeralAsync("This command can only be used in a server.");
             return;
@@ -74,7 +88,7 @@ public sealed class NpcCommands : ApplicationCommandModule<ApplicationCommandCon
 
         try
         {
-            var npc = await _npcService.CreateNpcAsync(guildId.Value, name, personality, voiceId);
+            var npc = await _npcService.CreateNpcAsync(guildId, name, personality, voiceId);
 
             var voiceInfo = voiceId is not null ? $"\nVoice ID: `{voiceId}`" : "";
             await RespondEphemeralAsync(
@@ -100,8 +114,7 @@ public sealed class NpcCommands : ApplicationCommandModule<ApplicationCommandCon
         [SlashCommandParameter(Name = "clear-voice", Description = "Clear the voice ID override")]
         bool clearVoice = false)
     {
-        var guildId = GetGuildId();
-        if (guildId is null)
+        if (!TryGetGuildId(out var guildId))
         {
             await RespondEphemeralAsync("This command can only be used in a server.");
             return;
@@ -115,7 +128,7 @@ public sealed class NpcCommands : ApplicationCommandModule<ApplicationCommandCon
 
         try
         {
-            var npc = await _npcService.UpdateNpcAsync(guildId.Value, name, newName, personality, voiceId, clearVoice);
+            var npc = await _npcService.UpdateNpcAsync(guildId, name, newName, personality, voiceId, clearVoice);
             await RespondEphemeralAsync($"Updated NPC **{npc.Name}**.");
         }
         catch (InvalidOperationException ex)
@@ -129,14 +142,13 @@ public sealed class NpcCommands : ApplicationCommandModule<ApplicationCommandCon
         [SlashCommandParameter(Name = "name", Description = "NPC name to delete", MaxLength = 100)]
         string name)
     {
-        var guildId = GetGuildId();
-        if (guildId is null)
+        if (!TryGetGuildId(out var guildId))
         {
             await RespondEphemeralAsync("This command can only be used in a server.");
             return;
         }
 
-        var deleted = await _npcService.DeleteNpcAsync(guildId.Value, name);
+        var deleted = await _npcService.DeleteNpcAsync(guildId, name);
         await RespondEphemeralAsync(deleted
             ? $"Deleted NPC **{name}** and its conversation history."
             : $"NPC '{name}' not found.");
@@ -145,21 +157,20 @@ public sealed class NpcCommands : ApplicationCommandModule<ApplicationCommandCon
     [SlashCommand("npc-list", "List all NPCs in this guild")]
     public async Task ListNpcsAsync()
     {
-        var guildId = GetGuildId();
-        if (guildId is null)
+        if (!TryGetGuildId(out var guildId))
         {
             await RespondEphemeralAsync("This command can only be used in a server.");
             return;
         }
 
-        var npcs = await _npcService.ListNpcsAsync(guildId.Value);
+        var npcs = await _npcService.ListNpcsAsync(guildId);
         if (npcs.Count == 0)
         {
             await RespondEphemeralAsync("No NPCs created yet. Use `/npc-create` to add one.");
             return;
         }
 
-        var settings = await _npcService.GetSettingsAsync(guildId.Value);
+        var settings = await _npcService.GetSettingsAsync(guildId);
 
         var lines = npcs.Select(n =>
         {
@@ -177,8 +188,7 @@ public sealed class NpcCommands : ApplicationCommandModule<ApplicationCommandCon
         [SlashCommandParameter(Name = "name", Description = "NPC name to activate", MaxLength = 100)]
         string name)
     {
-        var guildId = GetGuildId();
-        if (guildId is null)
+        if (!TryGetGuildId(out var guildId))
         {
             await RespondEphemeralAsync("This command can only be used in a server.");
             return;
@@ -186,7 +196,7 @@ public sealed class NpcCommands : ApplicationCommandModule<ApplicationCommandCon
 
         try
         {
-            await _npcService.SetActiveNpcAsync(guildId.Value, name);
+            await _npcService.SetActiveNpcAsync(guildId, name);
             await RespondEphemeralAsync($"Active NPC set to **{name}**.");
         }
         catch (InvalidOperationException ex)
@@ -198,16 +208,15 @@ public sealed class NpcCommands : ApplicationCommandModule<ApplicationCommandCon
     [SlashCommand("npc-auto-switch", "Toggle automatic NPC selection")]
     public async Task ToggleAutoSwitchAsync()
     {
-        var guildId = GetGuildId();
-        if (guildId is null)
+        if (!TryGetGuildId(out var guildId))
         {
             await RespondEphemeralAsync("This command can only be used in a server.");
             return;
         }
 
-        var settings = await _npcService.GetSettingsAsync(guildId.Value);
+        var settings = await _npcService.GetSettingsAsync(guildId);
         var newValue = !settings.AutoSwitchEnabled;
-        await _npcService.SetAutoSwitchAsync(guildId.Value, newValue);
+        await _npcService.SetAutoSwitchAsync(guildId, newValue);
         await RespondEphemeralAsync($"Auto-switch is now **{(newValue ? "enabled" : "disabled")}**.");
     }
 
@@ -216,21 +225,20 @@ public sealed class NpcCommands : ApplicationCommandModule<ApplicationCommandCon
         [SlashCommandParameter(Name = "shared", Description = "true = shared timeline, false = per-NPC isolation")]
         bool shared)
     {
-        var guildId = GetGuildId();
-        if (guildId is null)
+        if (!TryGetGuildId(out var guildId))
         {
             await RespondEphemeralAsync("This command can only be used in a server.");
             return;
         }
 
-        var settings = await _npcService.GetSettingsAsync(guildId.Value);
+        var settings = await _npcService.GetSettingsAsync(guildId);
         if (settings.SharedHistory == shared)
         {
             await RespondEphemeralAsync($"History mode is already **{(shared ? "shared" : "per-NPC")}**.");
             return;
         }
 
-        await _npcService.SetHistoryModeAsync(guildId.Value, shared);
+        await _npcService.SetHistoryModeAsync(guildId, shared);
         await RespondEphemeralAsync(
             $"History mode set to **{(shared ? "shared" : "per-NPC")}**. All conversation history has been cleared.");
     }
@@ -240,8 +248,7 @@ public sealed class NpcCommands : ApplicationCommandModule<ApplicationCommandCon
         [SlashCommandParameter(Name = "name", Description = "NPC name (omit to clear all)", MaxLength = 100)]
         string? name = null)
     {
-        var guildId = GetGuildId();
-        if (guildId is null)
+        if (!TryGetGuildId(out var guildId))
         {
             await RespondEphemeralAsync("This command can only be used in a server.");
             return;
@@ -250,7 +257,7 @@ public sealed class NpcCommands : ApplicationCommandModule<ApplicationCommandCon
         int? npcId = null;
         if (name is not null)
         {
-            var npc = await _npcService.GetNpcAsync(guildId.Value, name);
+            var npc = await _npcService.GetNpcAsync(guildId, name);
             if (npc is null)
             {
                 await RespondEphemeralAsync($"NPC '{name}' not found.");
@@ -259,7 +266,7 @@ public sealed class NpcCommands : ApplicationCommandModule<ApplicationCommandCon
             npcId = npc.Id;
         }
 
-        await _npcService.ClearHistoryAsync(guildId.Value, npcId);
+        await _npcService.ClearHistoryAsync(guildId, npcId);
         await RespondEphemeralAsync(name is not null
             ? $"Cleared conversation history for **{name}**."
             : "Cleared all conversation history.");
@@ -268,15 +275,14 @@ public sealed class NpcCommands : ApplicationCommandModule<ApplicationCommandCon
     [SlashCommand("npc-status", "View NPC settings and active NPC")]
     public async Task StatusAsync()
     {
-        var guildId = GetGuildId();
-        if (guildId is null)
+        if (!TryGetGuildId(out var guildId))
         {
             await RespondEphemeralAsync("This command can only be used in a server.");
             return;
         }
 
-        var settings = await _npcService.GetSettingsAsync(guildId.Value);
-        var npcCount = await _npcService.GetNpcCountAsync(guildId.Value);
+        var settings = await _npcService.GetSettingsAsync(guildId);
+        var npcCount = await _npcService.GetNpcCountAsync(guildId);
 
         string activeNpcName = "None";
         if (settings.ActiveNpcId is not null)
@@ -299,8 +305,7 @@ public sealed class NpcCommands : ApplicationCommandModule<ApplicationCommandCon
         [SlashCommandParameter(Name = "json", Description = "JSON data to import", MaxLength = 2000)]
         string json)
     {
-        var guildId = GetGuildId();
-        if (guildId is null)
+        if (!TryGetGuildId(out var guildId))
         {
             await RespondEphemeralAsync("This command can only be used in a server.");
             return;
@@ -308,7 +313,7 @@ public sealed class NpcCommands : ApplicationCommandModule<ApplicationCommandCon
 
         try
         {
-            var result = await _npcService.ImportNpcsAsync(guildId.Value, json);
+            var result = await _npcService.ImportNpcsAsync(guildId, json);
             var msg = $"Imported **{result.CreatedCount}** NPC(s).";
             if (result.SkippedNames.Count > 0)
                 msg += $"\nSkipped (already exist or limit reached): {string.Join(", ", result.SkippedNames)}";
@@ -323,14 +328,13 @@ public sealed class NpcCommands : ApplicationCommandModule<ApplicationCommandCon
     [SlashCommand("npc-export", "Export all NPCs as JSON")]
     public async Task ExportNpcsAsync()
     {
-        var guildId = GetGuildId();
-        if (guildId is null)
+        if (!TryGetGuildId(out var guildId))
         {
             await RespondEphemeralAsync("This command can only be used in a server.");
             return;
         }
 
-        var json = await _npcService.ExportNpcsAsync(guildId.Value);
+        var json = await _npcService.ExportNpcsAsync(guildId);
         await RespondEphemeralAsync($"```json\n{json}\n```");
     }
 
@@ -339,38 +343,29 @@ public sealed class NpcCommands : ApplicationCommandModule<ApplicationCommandCon
         [SlashCommandParameter(Name = "message", Description = "Your message to the character", MaxLength = 1000)]
         string message)
     {
-        var guildId = GetGuildId();
-        if (guildId is null)
+        if (!TryGetGuildId(out var guildId))
         {
-            await RespondAsync(InteractionCallback.Message(new InteractionMessageProperties
-            {
-                Content = "This command can only be used in a server.",
-                Flags = MessageFlags.Ephemeral
-            }));
+            await RespondEphemeralAsync("This command can only be used in a server.");
             return;
         }
 
-        // Get guild's configured voice channel
-        var config = await _guildConfig.GetConfigurationAsync(guildId.Value);
+        var config = await _guildConfig.GetConfigurationAsync(guildId);
         if (config?.VoiceChannelId is null || config.VoiceChannelId.Value == 0)
         {
-            await RespondAsync(InteractionCallback.Message(new InteractionMessageProperties
-            {
-                Content = "No voice channel configured. Please run `/tts-setup` first to configure a default voice channel.",
-                Flags = MessageFlags.Ephemeral
-            }));
+            await RespondEphemeralAsync(
+                "No voice channel configured. Please run `/tts-setup` first to configure a default voice channel.");
             return;
         }
 
         var voiceChannelId = config.VoiceChannelId.Value;
 
-        // Defer response since LLM call may take time (NOT ephemeral - visible to all)
+        // Defer since LLM call may take time (visible to all, not ephemeral)
         await RespondAsync(InteractionCallback.DeferredMessage());
 
         try
         {
-            var settings = await _npcService.GetSettingsAsync(guildId.Value);
-            var npcs = await _npcService.ListNpcsAsync(guildId.Value);
+            var settings = await _npcService.GetSettingsAsync(guildId);
+            var npcs = await _npcService.ListNpcsAsync(guildId);
 
             if (npcs.Count == 0)
             {
@@ -385,9 +380,9 @@ public sealed class NpcCommands : ApplicationCommandModule<ApplicationCommandCon
             NpcDefinition respondingNpc;
             if (settings.AutoSwitchEnabled && npcs.Count > 1)
             {
-                var history = await _npcService.GetHistoryAsync(guildId.Value);
+                var history = await _npcService.GetHistoryAsync(guildId);
                 respondingNpc = await _selectionService.SelectNpcAsync(
-                    guildId.Value, message, npcs, history);
+                    guildId, message, npcs, history);
             }
             else if (settings.ActiveNpcId is not null)
             {
@@ -400,7 +395,7 @@ public sealed class NpcCommands : ApplicationCommandModule<ApplicationCommandCon
             }
 
             // Get history for LLM context
-            var npcHistory = await _npcService.GetHistoryAsync(guildId.Value,
+            var npcHistory = await _npcService.GetHistoryAsync(guildId,
                 settings.SharedHistory ? null : respondingNpc.Id);
 
             // Map to LLM conversation messages
@@ -417,8 +412,8 @@ public sealed class NpcCommands : ApplicationCommandModule<ApplicationCommandCon
                 respondingNpc.Personality, conversationMessages, message);
 
             // Store messages in history
-            await _npcService.AddMessageAsync(guildId.Value, null, null, "user", message);
-            await _npcService.AddMessageAsync(guildId.Value, respondingNpc.Id, respondingNpc.Name, "assistant", response);
+            await _npcService.AddMessageAsync(guildId, null, null, "user", message);
+            await _npcService.AddMessageAsync(guildId, respondingNpc.Id, respondingNpc.Name, "assistant", response);
 
             // Sanitize and truncate for TTS
             var sanitizedResponse = TextSanitizer.Sanitize(response);
@@ -432,7 +427,7 @@ public sealed class NpcCommands : ApplicationCommandModule<ApplicationCommandCon
             var queueItem = new TtsQueueItem
             {
                 Id = Guid.NewGuid(),
-                GuildId = guildId.Value,
+                GuildId = guildId,
                 TextChannelId = 0,
                 VoiceChannelId = voiceChannelId,
                 Text = sanitizedResponse,
@@ -444,7 +439,7 @@ public sealed class NpcCommands : ApplicationCommandModule<ApplicationCommandCon
 
             _logger.LogInformation(
                 "User {UserId} prompted NPC '{NpcName}' in guild {GuildId}, response queued for TTS",
-                Context.User.Id, respondingNpc.Name, guildId.Value);
+                Context.User.Id, respondingNpc.Name, guildId);
 
             // Show the conversation (visible to all)
             var displayResponse = response.Length > 1500
@@ -458,7 +453,7 @@ public sealed class NpcCommands : ApplicationCommandModule<ApplicationCommandCon
         }
         catch (LlmServiceException ex)
         {
-            _logger.LogError(ex, "LLM service error for guild {GuildId}", guildId.Value);
+            _logger.LogError(ex, "LLM service error for guild {GuildId}", guildId);
             await FollowupAsync(new InteractionMessageProperties
             {
                 Content = $"Failed to get AI response: {ex.Message}"
