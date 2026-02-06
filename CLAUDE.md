@@ -154,6 +154,7 @@ src/ErosTTS.Bot/
 - **docs-updater**: After making code changes that affect configuration, slash commands, project structure, dependencies, or code patterns, run the `docs-updater` agent to keep CLAUDE.md and other documentation in sync.
 - **dockerfile-verifier**: After making changes to `docker/Dockerfile`, `docker/docker-compose.yml`, configuration classes, environment variables, or runtime dependencies, run the `dockerfile-verifier` agent to verify Docker files stay correct and consistent.
 - **test-runner**: After making code changes, run the `test-runner` agent to execute the unit test suite and report results.
+- **code-simplifier**: After feature additions or refactors, run the `code-simplifier` agent (built-in `code-simplifier:code-simplifier` subagent type) to review recently modified code for unnecessary complexity, redundant patterns, or over-engineering while preserving all functionality.
 
 ## Code Patterns
 

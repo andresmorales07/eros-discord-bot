@@ -1,0 +1,10 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "command": "if echo \"$CLAUDE_FILE_PATH\" | grep -q '\\.cs$'; then dotnet format src/ErosTTS.Bot --include \"$CLAUDE_FILE_PATH\" --no-restore --verbosity quiet 2>/dev/null; dotnet format tests/ErosTTS.Bot.Tests --include \"$CLAUDE_FILE_PATH\" --no-restore --verbosity quiet 2>/dev/null; fi; exit 0"
+      }
+    ]
+  }
+}
