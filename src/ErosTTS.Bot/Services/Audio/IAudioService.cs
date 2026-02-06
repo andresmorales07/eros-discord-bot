@@ -26,4 +26,9 @@ public interface IAudioService
     /// <param name="guildId">The guild ID to check.</param>
     /// <returns>True if connected to a voice channel in the guild.</returns>
     bool IsConnected(ulong guildId);
+
+    /// <summary>
+    /// Gets the IDs of all guilds where the bot is currently connected to voice.
+    /// </summary>
+    IReadOnlyCollection<ulong> GetConnectedGuildIds();
 }

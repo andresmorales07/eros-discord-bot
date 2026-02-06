@@ -18,7 +18,8 @@ public class VoiceInactivityHostedServiceTests : IDisposable
         _inspector = Substitute.For<IVoiceChannelInspector>();
         _logger = Substitute.For<ILogger<VoiceInactivityHostedService>>();
         _service = new VoiceInactivityHostedService(
-            _inspector, _logger, gatewayClient: null, disconnectDelay: TestDelay);
+            _inspector, _logger, gatewayClient: null, disconnectDelay: TestDelay,
+            pollingInterval: Timeout.InfiniteTimeSpan);
     }
 
     public void Dispose()
@@ -248,5 +249,59 @@ public class VoiceInactivityHostedServiceTests : IDisposable
         _service.HandleVoiceStateChange(GuildId);
 
         _service.HasPendingTimer(GuildId).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Poll_DiscoversEmptyChannel_StartsTimer()
+    {
+        var pollInterval = TimeSpan.FromMilliseconds(50);
+        var inspector = Substitute.For<IVoiceChannelInspector>();
+        var logger = Substitute.For<ILogger<VoiceInactivityHostedService>>();
+        var service = new VoiceInactivityHostedService(
+            inspector, logger, gatewayClient: null,
+            disconnectDelay: TimeSpan.FromSeconds(30),
+            pollingInterval: pollInterval);
+
+        inspector.GetConnectedGuildIds().Returns(new List<ulong> { GuildId });
+        inspector.IsBotConnected(GuildId).Returns(true);
+        inspector.GetBotVoiceChannelId(GuildId).Returns(ChannelId);
+        inspector.CountNonBotUsersInChannel(GuildId, ChannelId).Returns(0);
+
+        await service.StartAsync(CancellationToken.None);
+
+        // Wait for at least one poll cycle
+        await Task.Delay(pollInterval + TimeSpan.FromMilliseconds(100));
+
+        service.HasPendingTimer(GuildId).Should().BeTrue();
+
+        await service.StopAsync(CancellationToken.None);
+        service.Dispose();
+    }
+
+    [Fact]
+    public async Task Poll_ChannelHasUsers_NoTimerStarted()
+    {
+        var pollInterval = TimeSpan.FromMilliseconds(50);
+        var inspector = Substitute.For<IVoiceChannelInspector>();
+        var logger = Substitute.For<ILogger<VoiceInactivityHostedService>>();
+        var service = new VoiceInactivityHostedService(
+            inspector, logger, gatewayClient: null,
+            disconnectDelay: TimeSpan.FromSeconds(30),
+            pollingInterval: pollInterval);
+
+        inspector.GetConnectedGuildIds().Returns(new List<ulong> { GuildId });
+        inspector.IsBotConnected(GuildId).Returns(true);
+        inspector.GetBotVoiceChannelId(GuildId).Returns(ChannelId);
+        inspector.CountNonBotUsersInChannel(GuildId, ChannelId).Returns(2);
+
+        await service.StartAsync(CancellationToken.None);
+
+        // Wait for at least one poll cycle
+        await Task.Delay(pollInterval + TimeSpan.FromMilliseconds(100));
+
+        service.HasPendingTimer(GuildId).Should().BeFalse();
+
+        await service.StopAsync(CancellationToken.None);
+        service.Dispose();
     }
 }

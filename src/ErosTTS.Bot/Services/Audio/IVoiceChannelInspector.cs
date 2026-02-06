@@ -26,4 +26,9 @@ internal interface IVoiceChannelInspector
     /// Disconnects the bot from voice in the specified guild.
     /// </summary>
     Task DisconnectBotAsync(ulong guildId);
+
+    /// <summary>
+    /// Gets the IDs of all guilds where the bot is currently connected to voice.
+    /// </summary>
+    IReadOnlyCollection<ulong> GetConnectedGuildIds();
 }

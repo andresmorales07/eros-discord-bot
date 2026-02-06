@@ -255,6 +255,11 @@ public sealed class AudioService : IAudioService, IAsyncDisposable
         return _voiceClients.ContainsKey(guildId);
     }
 
+    public IReadOnlyCollection<ulong> GetConnectedGuildIds()
+    {
+        return _voiceClients.Keys.ToList();
+    }
+
     public async ValueTask DisposeAsync()
     {
         _logger.LogInformation("Disposing AudioService, disconnecting from all guilds");

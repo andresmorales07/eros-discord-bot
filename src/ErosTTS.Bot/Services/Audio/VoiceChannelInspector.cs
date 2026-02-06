@@ -48,4 +48,6 @@ internal sealed class VoiceChannelInspector : IVoiceChannelInspector
     }
 
     public Task DisconnectBotAsync(ulong guildId) => _audioService.DisconnectAsync(guildId);
+
+    public IReadOnlyCollection<ulong> GetConnectedGuildIds() => _audioService.GetConnectedGuildIds();
 }

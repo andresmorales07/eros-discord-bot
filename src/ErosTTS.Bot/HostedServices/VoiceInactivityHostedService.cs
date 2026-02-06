@@ -13,51 +13,101 @@ namespace ErosTTS.Bot.HostedServices;
 internal sealed class VoiceInactivityHostedService : IHostedService, IDisposable
 {
     internal static readonly TimeSpan DefaultDisconnectDelay = TimeSpan.FromMinutes(1);
+    internal static readonly TimeSpan DefaultPollingInterval = TimeSpan.FromSeconds(30);
 
     private readonly GatewayClient? _gatewayClient;
     private readonly IVoiceChannelInspector _inspector;
     private readonly ILogger<VoiceInactivityHostedService> _logger;
     private readonly TimeSpan _disconnectDelay;
+    private readonly TimeSpan _pollingInterval;
     private readonly ConcurrentDictionary<ulong, CancellationTokenSource> _timers = new();
+    private CancellationTokenSource? _pollCts;
+    private Task? _pollTask;
 
     public VoiceInactivityHostedService(
         GatewayClient gatewayClient,
         IVoiceChannelInspector inspector,
         ILogger<VoiceInactivityHostedService> logger)
-        : this(inspector, logger, gatewayClient, DefaultDisconnectDelay)
+        : this(inspector, logger, gatewayClient, DefaultDisconnectDelay, DefaultPollingInterval)
     {
     }
 
     /// <summary>
-    /// Internal constructor for testing — allows injecting a custom delay and omitting GatewayClient.
+    /// Internal constructor for testing — allows injecting a custom delay/interval and omitting GatewayClient.
     /// </summary>
     internal VoiceInactivityHostedService(
         IVoiceChannelInspector inspector,
         ILogger<VoiceInactivityHostedService> logger,
         GatewayClient? gatewayClient = null,
-        TimeSpan? disconnectDelay = null)
+        TimeSpan? disconnectDelay = null,
+        TimeSpan? pollingInterval = null)
     {
         _gatewayClient = gatewayClient;
         _inspector = inspector;
         _logger = logger;
         _disconnectDelay = disconnectDelay ?? DefaultDisconnectDelay;
+        _pollingInterval = pollingInterval ?? DefaultPollingInterval;
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
         if (_gatewayClient is not null)
             _gatewayClient.VoiceStateUpdate += OnVoiceStateUpdate;
+
+        _pollCts = new CancellationTokenSource();
+        _pollTask = PollConnectedGuildsAsync(_pollCts.Token);
+
         _logger.LogInformation("Voice inactivity monitor started");
         return Task.CompletedTask;
     }
 
-    public Task StopAsync(CancellationToken cancellationToken)
+    public async Task StopAsync(CancellationToken cancellationToken)
     {
         if (_gatewayClient is not null)
             _gatewayClient.VoiceStateUpdate -= OnVoiceStateUpdate;
+
+        if (_pollCts is not null)
+        {
+            await _pollCts.CancelAsync();
+            if (_pollTask is not null)
+            {
+                await _pollTask;
+            }
+            _pollCts.Dispose();
+            _pollCts = null;
+            _pollTask = null;
+        }
+
         CancelAllTimers();
         _logger.LogInformation("Voice inactivity monitor stopped");
-        return Task.CompletedTask;
+    }
+
+    private async Task PollConnectedGuildsAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(_pollingInterval, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+
+            try
+            {
+                var guildIds = _inspector.GetConnectedGuildIds();
+                foreach (var guildId in guildIds)
+                {
+                    HandleVoiceStateChange(guildId);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during voice inactivity polling");
+            }
+        }
     }
 
     private ValueTask OnVoiceStateUpdate(VoiceState voiceState)
@@ -188,6 +238,8 @@ internal sealed class VoiceInactivityHostedService : IHostedService, IDisposable
 
     public void Dispose()
     {
+        _pollCts?.Cancel();
+        _pollCts?.Dispose();
         CancelAllTimers();
     }
 }
