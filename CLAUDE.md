@@ -64,7 +64,13 @@ cd docker && docker-compose up -d
 
 The bot image is published to `ghcr.io/andresmorales07/eros-discord-bot`.
 
+Two Docker Compose files are available:
+- **`docker-compose.yml`** (root) - For deploying the pre-built GHCR image
+- **`docker/docker-compose.yml`** - For building and running from local source
+
 ### Docker Compose (GHCR image)
+
+Use the root-level `docker-compose.yml` file to run the published image
 
 ```yaml
 services:
@@ -101,11 +107,13 @@ volumes:
 
 ### Building from Source
 
+Use `docker/docker-compose.yml` to build and run from local source:
+
 ```bash
 # Build the image locally
 docker build -f docker/Dockerfile -t eros-discord-bot .
 
-# Run with docker-compose (uses local build)
+# Run with docker-compose (uses local build from docker/docker-compose.yml)
 cd docker && docker-compose up -d
 ```
 

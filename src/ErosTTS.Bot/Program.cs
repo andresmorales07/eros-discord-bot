@@ -46,7 +46,7 @@ try
 
     // Build configuration early to determine required gateway intents
     var configuration = new ConfigurationBuilder()
-        .AddJsonFile("appsettings.json", optional: false)
+        .AddJsonFile("appsettings.json", optional: true)
         .AddEnvironmentVariables("EROSTTS_")
         .Build();
 
@@ -55,7 +55,7 @@ try
     var builder = Host.CreateDefaultBuilder(args)
         .ConfigureAppConfiguration((context, config) =>
         {
-            config.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+            config.AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
                   .AddJsonFile($"appsettings.{context.HostingEnvironment.EnvironmentName}.json", optional: true, reloadOnChange: true)
                   .AddEnvironmentVariables("EROSTTS_");
         })
