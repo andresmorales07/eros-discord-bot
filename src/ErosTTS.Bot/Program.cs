@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NetCord;
 using NetCord.Gateway;
@@ -94,10 +95,20 @@ try
                 context.Configuration.GetSection(DatabaseConfiguration.SectionName));
             services.Configure<NpcConfiguration>(
                 context.Configuration.GetSection(NpcConfiguration.SectionName));
+            services.Configure<TtsCacheConfiguration>(
+                context.Configuration.GetSection(TtsCacheConfiguration.SectionName));
 
-            // HTTP Client for Eleven Labs with retry policy
-            services.AddHttpClient<ITtsService, ElevenLabsTtsService>()
+            // HTTP Client for Eleven Labs with retry policy (concrete type for decorator wrapping)
+            services.AddHttpClient<ElevenLabsTtsService>()
                 .AddPolicyHandler(GetRetryPolicy());
+
+            // Register CachedTtsService as ITtsService (wraps ElevenLabsTtsService)
+            services.AddSingleton<ITtsService>(sp =>
+                new CachedTtsService(
+                    sp.GetRequiredService<ElevenLabsTtsService>(),
+                    sp.GetRequiredService<IOptions<TtsCacheConfiguration>>(),
+                    sp.GetRequiredService<IOptions<ElevenLabsConfiguration>>(),
+                    sp.GetRequiredService<ILogger<CachedTtsService>>()));
 
             // HTTP Client for OpenRouter with retry policy
             services.AddHttpClient<ILlmService, OpenRouterService>()

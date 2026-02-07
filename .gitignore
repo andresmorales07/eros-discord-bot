@@ -94,6 +94,9 @@ $RECYCLE.BIN/
 # Mac
 .DS_Store
 
+# Runtime data (cache, database)
+data/
+
 # Application specific
 appsettings.json
 appsettings.Development.json

@@ -20,7 +20,7 @@ public sealed class ElevenLabsConfiguration
     /// <summary>
     /// The model ID to use for TTS.
     /// </summary>
-    public string ModelId { get; init; } = "eleven_multilingual_v2";
+    public string ModelId { get; init; } = "eleven_turbo_v2_5";
 
     /// <summary>
     /// Output audio format.

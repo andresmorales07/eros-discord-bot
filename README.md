@@ -8,6 +8,7 @@ A Discord bot that converts text to speech using the Eleven Labs API and plays i
 - **Multi-NPC Roleplaying** - Create multiple named NPCs with individual personalities, voices, and conversation histories
 - **Auto-switch** - LLM-driven NPC selection automatically picks the best character to respond
 - **Per-NPC voices** - Each NPC can have its own ElevenLabs voice ID
+- **TTS Caching** - Audio files cached on disk to reduce API costs and improve response time
 - **Import/Export** - Share NPC configurations between guilds via JSON
 - **Privacy-focused** - Bot joins voice channels self-deafened and command responses are ephemeral (except `/prompt`)
 - Converts text to speech using Eleven Labs TTS API
@@ -51,7 +52,10 @@ A Discord bot that converts text to speech using the Eleven Labs API and plays i
 | `EROSTTS_Discord__Token` | Discord bot token | Yes |
 | `EROSTTS_ElevenLabs__ApiKey` | Eleven Labs API key | Yes |
 | `EROSTTS_ElevenLabs__VoiceId` | Voice ID to use | No (defaults to Rachel) |
+| `EROSTTS_ElevenLabs__ModelId` | ElevenLabs model to use | No (defaults to `eleven_turbo_v2_5`) |
 | `EROSTTS_Voice__FFmpegPath` | Path to FFmpeg executable | No (defaults to `ffmpeg`) |
+| `EROSTTS_TtsCache__Enabled` | Enable TTS audio caching | No (defaults to `true`) |
+| `EROSTTS_TtsCache__CacheDirectory` | Directory for cached audio files | No (defaults to `data/tts-cache`) |
 | `EROSTTS_OpenRouter__ApiKey` | OpenRouter API key for AI features | No (AI features disabled if not set) |
 | `EROSTTS_OpenRouter__Model` | LLM model to use | No (defaults to `anthropic/claude-3.5-sonnet`) |
 
@@ -68,7 +72,7 @@ A Discord bot that converts text to speech using the Eleven Labs API and plays i
   "ElevenLabs": {
     "ApiKey": "your_api_key_here",
     "VoiceId": "21m00Tcm4TlvDq8ikWAM",
-    "ModelId": "eleven_multilingual_v2",
+    "ModelId": "eleven_turbo_v2_5",
     "Stability": 0.5,
     "SimilarityBoost": 0.75
   },
@@ -93,6 +97,10 @@ A Discord bot that converts text to speech using the Eleven Labs API and plays i
     "MaxHistoryMessages": 50,
     "AutoSwitchContextMessages": 5
   },
+  "TtsCache": {
+    "Enabled": true,
+    "CacheDirectory": "data/tts-cache"
+  },
   "Database": {
     "Provider": "InMemory",
     "ConnectionString": "Data Source=data/erostts.db"
@@ -107,7 +115,10 @@ A Discord bot that converts text to speech using the Eleven Labs API and plays i
 | `Discord:EnableTextChannelMonitoring` | Enable legacy text channel monitoring mode | `false` |
 | `Discord:MaxMessageLength` | Maximum characters for TTS | `500` |
 | `Discord:ProcessBotMessages` | Process messages from other bots | `false` |
+| `ElevenLabs:ModelId` | ElevenLabs model (turbo_v2_5 is faster/cheaper, multilingual_v2 supports more languages) | `eleven_turbo_v2_5` |
 | `Voice:FFmpegPath` | Path to FFmpeg executable | `ffmpeg` |
+| `TtsCache:Enabled` | Enable TTS audio caching to disk | `true` |
+| `TtsCache:CacheDirectory` | Directory for cached TTS audio files | `data/tts-cache` |
 | `OpenRouter:Model` | LLM model ID (see [OpenRouter models](https://openrouter.ai/models)) | `anthropic/claude-3.5-sonnet` |
 | `OpenRouter:MaxTokens` | Maximum tokens in AI response | `500` |
 | `OpenRouter:Temperature` | Response randomness (0.0-2.0) | `0.8` |
@@ -378,7 +389,7 @@ ErosTTS.Bot/
 │   ├── LLM/               # OpenRouter API client + ConversationMessage DTO
 │   ├── Npc/               # Multi-NPC system (CRUD, auto-switch, history, import/export)
 │   ├── Queue/             # Message queue (System.Threading.Channels)
-│   └── TTS/               # Eleven Labs API client
+│   └── TTS/               # Eleven Labs API client (with caching decorator)
 ├── Utilities/             # Text sanitization utilities
 └── Program.cs             # Host builder and DI configuration
 ```

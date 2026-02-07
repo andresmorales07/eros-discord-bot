@@ -44,9 +44,11 @@ cd docker && docker-compose up -d
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `EROSTTS_ElevenLabs__VoiceId` | `21m00Tcm4TlvDq8ikWAM` | Eleven Labs voice ID (Rachel) |
-| `EROSTTS_ElevenLabs__ModelId` | `eleven_multilingual_v2` | Eleven Labs model |
+| `EROSTTS_ElevenLabs__ModelId` | `eleven_turbo_v2_5` | Eleven Labs model (faster, cheaper, English-only) |
 | `EROSTTS_ElevenLabs__Stability` | `0.5` | Voice stability (0.0-1.0) |
 | `EROSTTS_ElevenLabs__SimilarityBoost` | `0.75` | Voice similarity boost (0.0-1.0) |
+| `EROSTTS_TtsCache__Enabled` | `true` | Enable TTS audio caching to disk |
+| `EROSTTS_TtsCache__CacheDirectory` | `data/tts-cache` | Directory for cached TTS audio files |
 | `EROSTTS_OpenRouter__Model` | `anthropic/claude-3.5-sonnet` | LLM model ID |
 | `EROSTTS_OpenRouter__MaxTokens` | `500` | Max response tokens |
 | `EROSTTS_OpenRouter__Temperature` | `0.8` | LLM temperature (0.0-2.0) |
@@ -141,7 +143,7 @@ src/ErosTTS.Bot/
 │   ├── LLM/               # OpenRouter API client + ConversationMessage DTO
 │   ├── Npc/               # Multi-NPC system (INpcService, INpcSelectionService, domain records)
 │   ├── Queue/             # TTS message queue (System.Threading.Channels)
-│   └── TTS/               # Eleven Labs API client
+│   └── TTS/               # Eleven Labs API client (ElevenLabsTtsService, CachedTtsService decorator)
 ├── Utilities/             # Text sanitization utilities
 └── Program.cs             # Host builder and DI configuration
 ```
@@ -172,6 +174,7 @@ src/ErosTTS.Bot/
 - **Slash commands**: NetCord's `ApplicationCommandModule<ApplicationCommandContext>` base class
 - **DI**: All services registered in `Program.cs` ConfigureServices
 - **Persistence**: Config-driven provider selection (`Database:Provider`): `InMemory` (default, ConcurrentDictionary), `Sqlite` (EF Core), or `Postgres` (future). EF services use `IDbContextFactory<T>` to stay singleton-compatible.
+- **Decorator pattern**: `CachedTtsService` decorates `ElevenLabsTtsService` to provide transparent disk caching of TTS audio. Cache keys use SHA256 hash of text+voiceId+modelId. Enabled by default via `TtsCache:Enabled` configuration.
 - **Async throughout**: Methods return `Task` or `Task<T>`
 
 ## Configuration Modes

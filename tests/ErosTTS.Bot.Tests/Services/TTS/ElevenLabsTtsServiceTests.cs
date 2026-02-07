@@ -21,7 +21,7 @@ public class ElevenLabsTtsServiceTests : IDisposable
         {
             ApiKey = "test-api-key",
             VoiceId = "test-voice-id",
-            ModelId = "eleven_multilingual_v2",
+            ModelId = "eleven_turbo_v2_5",
             OutputFormat = "mp3_44100_128",
             Stability = 0.5,
             SimilarityBoost = 0.75,
