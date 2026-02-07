@@ -25,7 +25,7 @@ public sealed class ElevenLabsConfiguration
     /// <summary>
     /// Output audio format.
     /// </summary>
-    public string OutputFormat { get; init; } = "mp3_44100_128";
+    public string OutputFormat { get; init; } = "mp3_22050_32";
 
     /// <summary>
     /// Voice stability setting (0.0 to 1.0).
