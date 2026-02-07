@@ -66,7 +66,7 @@ public class CachedTtsServiceTests : IDisposable
         await _innerService.Received(1).SynthesizeAsync("hello", null, Arg.Any<CancellationToken>());
 
         // Verify file was written to disk
-        var cacheKey = CachedTtsService.ComputeCacheKey("hello", "default-voice", "eleven_turbo_v2_5");
+        var cacheKey = CachedTtsService.ComputeCacheKey("hello", "default-voice", "eleven_turbo_v2_5", "mp3_22050_32");
         var cachePath = Path.Combine(_cacheDir, $"{cacheKey}.mp3");
         File.Exists(cachePath).Should().BeTrue();
         var cachedBytes = await File.ReadAllBytesAsync(cachePath);
@@ -77,7 +77,7 @@ public class CachedTtsServiceTests : IDisposable
     public async Task SynthesizeAsync_CacheHit_ReturnsCachedFileWithoutCallingInner()
     {
         var audioData = new byte[] { 0xAA, 0xBB, 0xCC };
-        var cacheKey = CachedTtsService.ComputeCacheKey("hello", "default-voice", "eleven_turbo_v2_5");
+        var cacheKey = CachedTtsService.ComputeCacheKey("hello", "default-voice", "eleven_turbo_v2_5", "mp3_22050_32");
         var cachePath = Path.Combine(_cacheDir, $"{cacheKey}.mp3");
 
         Directory.CreateDirectory(_cacheDir);
@@ -131,8 +131,8 @@ public class CachedTtsServiceTests : IDisposable
     [Fact]
     public void ComputeCacheKey_SameInputs_ReturnsSameKey()
     {
-        var key1 = CachedTtsService.ComputeCacheKey("hello", "voice1", "model1");
-        var key2 = CachedTtsService.ComputeCacheKey("hello", "voice1", "model1");
+        var key1 = CachedTtsService.ComputeCacheKey("hello", "voice1", "model1", "mp3_22050_32");
+        var key2 = CachedTtsService.ComputeCacheKey("hello", "voice1", "model1", "mp3_22050_32");
 
         key1.Should().Be(key2);
     }
@@ -140,8 +140,8 @@ public class CachedTtsServiceTests : IDisposable
     [Fact]
     public void ComputeCacheKey_DifferentText_ReturnsDifferentKey()
     {
-        var key1 = CachedTtsService.ComputeCacheKey("hello", "voice1", "model1");
-        var key2 = CachedTtsService.ComputeCacheKey("world", "voice1", "model1");
+        var key1 = CachedTtsService.ComputeCacheKey("hello", "voice1", "model1", "mp3_22050_32");
+        var key2 = CachedTtsService.ComputeCacheKey("world", "voice1", "model1", "mp3_22050_32");
 
         key1.Should().NotBe(key2);
     }
@@ -149,8 +149,8 @@ public class CachedTtsServiceTests : IDisposable
     [Fact]
     public void ComputeCacheKey_DifferentVoice_ReturnsDifferentKey()
     {
-        var key1 = CachedTtsService.ComputeCacheKey("hello", "voice1", "model1");
-        var key2 = CachedTtsService.ComputeCacheKey("hello", "voice2", "model1");
+        var key1 = CachedTtsService.ComputeCacheKey("hello", "voice1", "model1", "mp3_22050_32");
+        var key2 = CachedTtsService.ComputeCacheKey("hello", "voice2", "model1", "mp3_22050_32");
 
         key1.Should().NotBe(key2);
     }
@@ -158,8 +158,17 @@ public class CachedTtsServiceTests : IDisposable
     [Fact]
     public void ComputeCacheKey_DifferentModel_ReturnsDifferentKey()
     {
-        var key1 = CachedTtsService.ComputeCacheKey("hello", "voice1", "model1");
-        var key2 = CachedTtsService.ComputeCacheKey("hello", "voice1", "model2");
+        var key1 = CachedTtsService.ComputeCacheKey("hello", "voice1", "model1", "mp3_22050_32");
+        var key2 = CachedTtsService.ComputeCacheKey("hello", "voice1", "model2", "mp3_22050_32");
+
+        key1.Should().NotBe(key2);
+    }
+
+    [Fact]
+    public void ComputeCacheKey_DifferentOutputFormat_ReturnsDifferentKey()
+    {
+        var key1 = CachedTtsService.ComputeCacheKey("hello", "voice1", "model1", "mp3_22050_32");
+        var key2 = CachedTtsService.ComputeCacheKey("hello", "voice1", "model1", "mp3_44100_128");
 
         key1.Should().NotBe(key2);
     }
@@ -176,7 +185,7 @@ public class CachedTtsServiceTests : IDisposable
         await service.SynthesizeAsync("hello", "custom-voice");
 
         // File should be cached using the custom voice in the key
-        var cacheKey = CachedTtsService.ComputeCacheKey("hello", "custom-voice", "eleven_turbo_v2_5");
+        var cacheKey = CachedTtsService.ComputeCacheKey("hello", "custom-voice", "eleven_turbo_v2_5", "mp3_22050_32");
         var cachePath = Path.Combine(_cacheDir, $"{cacheKey}.mp3");
         File.Exists(cachePath).Should().BeTrue();
     }

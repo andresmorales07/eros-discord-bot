@@ -77,6 +77,18 @@ public class ElevenLabsTtsServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task SynthesizeAsync_IncludesOutputFormatAsQueryParameter()
+    {
+        _httpHandler.EnqueueResponse(HttpStatusCode.OK, new byte[] { 0x00 });
+        var service = CreateService();
+
+        await service.SynthesizeAsync("Test");
+
+        var request = _httpHandler.SentRequests[0];
+        request.RequestUri!.Query.Should().Contain("output_format=mp3_44100_128");
+    }
+
+    [Fact]
     public async Task SynthesizeAsync_WithTooManyRequests_ThrowsRateLimitException()
     {
         _httpHandler.EnqueueRateLimitResponse(TimeSpan.FromSeconds(30));

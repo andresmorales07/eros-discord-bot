@@ -35,13 +35,12 @@ public sealed class ElevenLabsTtsService : ITtsService
     public async Task<Stream> SynthesizeAsync(string text, string? voiceId = null, CancellationToken ct = default)
     {
         var effectiveVoiceId = voiceId ?? _config.VoiceId;
-        var url = $"{BaseUrl}/text-to-speech/{effectiveVoiceId}";
+        var url = $"{BaseUrl}/text-to-speech/{effectiveVoiceId}?output_format={_config.OutputFormat}";
 
         var payload = new
         {
             text,
             model_id = _config.ModelId,
-            output_format = _config.OutputFormat,
             voice_settings = new
             {
                 stability = _config.Stability,

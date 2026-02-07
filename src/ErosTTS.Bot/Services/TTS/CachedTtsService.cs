@@ -36,7 +36,7 @@ public sealed class CachedTtsService : ITtsService
         }
 
         var effectiveVoiceId = voiceId ?? _elevenLabsConfig.VoiceId;
-        var cacheKey = ComputeCacheKey(text, effectiveVoiceId, _elevenLabsConfig.ModelId);
+        var cacheKey = ComputeCacheKey(text, effectiveVoiceId, _elevenLabsConfig.ModelId, _elevenLabsConfig.OutputFormat);
         var cachePath = Path.Combine(_cacheConfig.CacheDirectory, $"{cacheKey}.mp3");
 
         if (File.Exists(cachePath))
@@ -48,15 +48,18 @@ public sealed class CachedTtsService : ITtsService
 
         _logger.LogDebug("TTS cache miss for key {CacheKey}", cacheKey);
 
-        var stream = await _inner.SynthesizeAsync(text, voiceId, ct);
+        await using var stream = await _inner.SynthesizeAsync(text, voiceId, ct);
+
+        // Read into a byte array for both caching and returning
+        var audioBytes = new MemoryStream();
+        await stream.CopyToAsync(audioBytes, ct);
 
         // Save to cache
         Directory.CreateDirectory(_cacheConfig.CacheDirectory);
-        var audioBytes = ((MemoryStream)stream).ToArray();
-        await File.WriteAllBytesAsync(cachePath, audioBytes, ct);
-        stream.Position = 0;
+        await File.WriteAllBytesAsync(cachePath, audioBytes.ToArray(), ct);
 
-        return stream;
+        audioBytes.Position = 0;
+        return audioBytes;
     }
 
     public Task<bool> ValidateApiKeyAsync(CancellationToken ct = default)
@@ -64,9 +67,9 @@ public sealed class CachedTtsService : ITtsService
         return _inner.ValidateApiKeyAsync(ct);
     }
 
-    internal static string ComputeCacheKey(string text, string voiceId, string modelId)
+    internal static string ComputeCacheKey(string text, string voiceId, string modelId, string outputFormat)
     {
-        var input = $"{text}|{voiceId}|{modelId}";
+        var input = $"{text}|{voiceId}|{modelId}|{outputFormat}";
         var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(input));
         return Convert.ToHexString(hashBytes).ToLowerInvariant();
     }
