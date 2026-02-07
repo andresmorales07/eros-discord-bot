@@ -1,5 +1,6 @@
 ---
 name: test-runner
+model: sonnet
 description: Run .NET unit tests and report results with failure details
 tools:
   - Bash
