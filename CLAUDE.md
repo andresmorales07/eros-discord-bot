@@ -45,6 +45,7 @@ cd docker && docker-compose up -d
 |----------|---------|-------------|
 | `EROSTTS_ElevenLabs__VoiceId` | `21m00Tcm4TlvDq8ikWAM` | Eleven Labs voice ID (Rachel) |
 | `EROSTTS_ElevenLabs__ModelId` | `eleven_turbo_v2_5` | Eleven Labs model (faster, cheaper, English-only) |
+| `EROSTTS_ElevenLabs__OutputFormat` | `mp3_22050_32` | Audio output format (lower quality sufficient for Discord voice, re-encodes to Opus) |
 | `EROSTTS_ElevenLabs__Stability` | `0.5` | Voice stability (0.0-1.0) |
 | `EROSTTS_ElevenLabs__SimilarityBoost` | `0.75` | Voice similarity boost (0.0-1.0) |
 | `EROSTTS_TtsCache__Enabled` | `true` | Enable TTS audio caching to disk |
@@ -174,7 +175,7 @@ src/ErosTTS.Bot/
 - **Slash commands**: NetCord's `ApplicationCommandModule<ApplicationCommandContext>` base class
 - **DI**: All services registered in `Program.cs` ConfigureServices
 - **Persistence**: Config-driven provider selection (`Database:Provider`): `InMemory` (default, ConcurrentDictionary), `Sqlite` (EF Core), or `Postgres` (future). EF services use `IDbContextFactory<T>` to stay singleton-compatible.
-- **Decorator pattern**: `CachedTtsService` decorates `ElevenLabsTtsService` to provide transparent disk caching of TTS audio. Cache keys use SHA256 hash of text+voiceId+modelId. Enabled by default via `TtsCache:Enabled` configuration.
+- **Decorator pattern**: `CachedTtsService` decorates `ElevenLabsTtsService` to provide transparent disk caching of TTS audio. Cache keys use SHA256 hash of text+voiceId+modelId+outputFormat. Enabled by default via `TtsCache:Enabled` configuration.
 - **Async throughout**: Methods return `Task` or `Task<T>`
 
 ## Configuration Modes
