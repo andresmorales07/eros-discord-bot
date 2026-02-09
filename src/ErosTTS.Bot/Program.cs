@@ -2,6 +2,7 @@ using ErosTTS.Bot.Configuration;
 using ErosTTS.Bot.Data;
 using ErosTTS.Bot.Extensions;
 using ErosTTS.Bot.HostedServices;
+using ErosTTS.Bot.Services;
 using ErosTTS.Bot.Services.Audio;
 using ErosTTS.Bot.Services.LLM;
 using ErosTTS.Bot.Services.Queue;
@@ -124,8 +125,13 @@ try
             // NPC selection service (auto-switch)
             services.AddSingleton<INpcSelectionService, NpcSelectionService>();
 
-            // Voice channel inspector (used by inactivity monitor)
+            // Voice channel inspector (used by inactivity monitor and voice resolver)
             services.AddSingleton<IVoiceChannelInspector, VoiceChannelInspector>();
+
+            // Extracted services for testability
+            services.AddSingleton<IMessageProcessingService, MessageProcessingService>();
+            services.AddSingleton<IPromptOrchestrationService, PromptOrchestrationService>();
+            services.AddSingleton<IVoiceChannelResolverService, VoiceChannelResolverService>();
 
             // Gateway event handlers (registered as hosted services)
             services.AddHostedService<GatewayEventHostedService>();

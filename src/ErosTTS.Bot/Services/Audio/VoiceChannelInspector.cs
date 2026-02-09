@@ -50,4 +50,15 @@ internal sealed class VoiceChannelInspector : IVoiceChannelInspector
     public Task DisconnectBotAsync(ulong guildId) => _audioService.DisconnectAsync(guildId);
 
     public IReadOnlyCollection<ulong> GetConnectedGuildIds() => _audioService.GetConnectedGuildIds();
+
+    public ulong? GetUserVoiceChannelId(ulong guildId, ulong userId)
+    {
+        if (!_gatewayClient.Cache.Guilds.TryGetValue(guildId, out var guild))
+            return null;
+
+        if (guild.VoiceStates.TryGetValue(userId, out var voiceState))
+            return voiceState.ChannelId;
+
+        return null;
+    }
 }

@@ -1,10 +1,9 @@
 using ErosTTS.Bot.Configuration;
 using ErosTTS.Bot.Exceptions;
+using ErosTTS.Bot.Services;
 using ErosTTS.Bot.Services.Guild;
-using ErosTTS.Bot.Services.LLM;
 using ErosTTS.Bot.Services.Npc;
 using ErosTTS.Bot.Services.Queue;
-using ErosTTS.Bot.Utilities;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NetCord;
@@ -19,30 +18,24 @@ namespace ErosTTS.Bot.Commands;
 public sealed class NpcCommands : ApplicationCommandModule<ApplicationCommandContext>
 {
     private readonly INpcService _npcService;
-    private readonly INpcSelectionService _selectionService;
     private readonly IGuildConfigurationService _guildConfig;
-    private readonly ILlmService _llmService;
+    private readonly IPromptOrchestrationService _promptService;
     private readonly ITtsQueue _queue;
-    private readonly BotConfiguration _botConfig;
     private readonly NpcConfiguration _npcConfig;
     private readonly ILogger<NpcCommands> _logger;
 
     public NpcCommands(
         INpcService npcService,
-        INpcSelectionService selectionService,
         IGuildConfigurationService guildConfig,
-        ILlmService llmService,
+        IPromptOrchestrationService promptService,
         ITtsQueue queue,
-        IOptions<BotConfiguration> botConfig,
         IOptions<NpcConfiguration> npcConfig,
         ILogger<NpcCommands> logger)
     {
         _npcService = npcService;
-        _selectionService = selectionService;
         _guildConfig = guildConfig;
-        _llmService = llmService;
+        _promptService = promptService;
         _queue = queue;
-        _botConfig = botConfig.Value;
         _npcConfig = npcConfig.Value;
         _logger = logger;
     }
@@ -364,91 +357,29 @@ public sealed class NpcCommands : ApplicationCommandModule<ApplicationCommandCon
 
         try
         {
-            var settings = await _npcService.GetSettingsAsync(guildId);
-            var npcs = await _npcService.ListNpcsAsync(guildId);
+            var result = await _promptService.HandlePromptAsync(guildId, voiceChannelId, message);
 
-            if (npcs.Count == 0)
-            {
-                await FollowupAsync(new InteractionMessageProperties
-                {
-                    Content = "No NPCs created yet. Use `/npc-create` to add one."
-                });
-                return;
-            }
-
-            // Determine which NPC responds
-            NpcDefinition respondingNpc;
-            if (settings.AutoSwitchEnabled && npcs.Count > 1)
-            {
-                var history = await _npcService.GetHistoryAsync(guildId);
-                respondingNpc = await _selectionService.SelectNpcAsync(
-                    guildId, message, npcs, history);
-            }
-            else if (settings.ActiveNpcId is not null)
-            {
-                respondingNpc = npcs.FirstOrDefault(n => n.Id == settings.ActiveNpcId)
-                    ?? npcs[0];
-            }
-            else
-            {
-                respondingNpc = npcs[0];
-            }
-
-            // Get history for LLM context
-            var npcHistory = await _npcService.GetHistoryAsync(guildId,
-                settings.SharedHistory ? null : respondingNpc.Id);
-
-            // Map to LLM conversation messages
-            var conversationMessages = npcHistory.Select(m =>
-            {
-                var content = settings.SharedHistory && m.NpcName is not null && m.Role == "assistant"
-                    ? $"[{m.NpcName}]: {m.Content}"
-                    : m.Content;
-                return new ConversationMessage { Role = m.Role, Content = content, Timestamp = m.Timestamp };
-            }).ToList();
-
-            // Get LLM response
-            var response = await _llmService.GetCompletionAsync(
-                respondingNpc.Personality, conversationMessages, message);
-
-            // Store messages in history
-            await _npcService.AddMessageAsync(guildId, null, null, "user", message);
-            await _npcService.AddMessageAsync(guildId, respondingNpc.Id, respondingNpc.Name, "assistant", response);
-
-            // Sanitize and truncate for TTS
-            var sanitizedResponse = TextSanitizer.Sanitize(response);
-            if (string.IsNullOrWhiteSpace(sanitizedResponse))
-                sanitizedResponse = "I have nothing to say.";
-
-            if (sanitizedResponse.Length > _botConfig.MaxMessageLength)
-                sanitizedResponse = sanitizedResponse[.._botConfig.MaxMessageLength];
-
-            // Queue TTS with NPC's voice
-            var queueItem = new TtsQueueItem
-            {
-                Id = Guid.NewGuid(),
-                GuildId = guildId,
-                TextChannelId = 0,
-                VoiceChannelId = voiceChannelId,
-                Text = sanitizedResponse,
-                Username = respondingNpc.Name,
-                VoiceId = respondingNpc.VoiceId
-            };
-
-            await _queue.EnqueueAsync(queueItem);
+            await _queue.EnqueueAsync(result.QueueItem);
 
             _logger.LogInformation(
                 "User {UserId} prompted NPC '{NpcName}' in guild {GuildId}, response queued for TTS",
-                Context.User.Id, respondingNpc.Name, guildId);
+                Context.User.Id, result.NpcName, guildId);
 
             // Show the conversation (visible to all)
-            var displayResponse = response.Length > 1500
-                ? response[..1500] + "..."
-                : response;
+            var displayResponse = result.Response.Length > 1500
+                ? result.Response[..1500] + "..."
+                : result.Response;
 
             await FollowupAsync(new InteractionMessageProperties
             {
-                Content = $"**{Context.User.Username}:** {message}\n\n**{respondingNpc.Name}:** {displayResponse}"
+                Content = $"**{Context.User.Username}:** {message}\n\n**{result.NpcName}:** {displayResponse}"
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            await FollowupAsync(new InteractionMessageProperties
+            {
+                Content = ex.Message
             });
         }
         catch (LlmServiceException ex)

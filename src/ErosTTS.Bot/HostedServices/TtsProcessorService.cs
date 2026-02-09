@@ -109,7 +109,7 @@ public sealed class TtsProcessorService : BackgroundService
         _logger.LogInformation("TTS Processor Service stopped");
     }
 
-    private async Task ProcessItemAsync(TtsQueueItem item, CancellationToken ct)
+    internal async Task ProcessItemAsync(TtsQueueItem item, CancellationToken ct)
     {
         using var scope = _logger.BeginScope(new Dictionary<string, object>
         {
@@ -155,7 +155,7 @@ public sealed class TtsProcessorService : BackgroundService
         }
     }
 
-    private async Task HandleFailureAsync(TtsQueueItem item, Exception ex, CancellationToken ct)
+    internal async Task HandleFailureAsync(TtsQueueItem item, Exception ex, CancellationToken ct)
     {
         using var scope = _logger.BeginScope(new Dictionary<string, object>
         {
