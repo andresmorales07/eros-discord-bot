@@ -144,7 +144,10 @@ src/ErosTTS.Bot/
 │   ├── LLM/               # OpenRouter API client + ConversationMessage DTO
 │   ├── Npc/               # Multi-NPC system (INpcService, INpcSelectionService, domain records)
 │   ├── Queue/             # TTS message queue (System.Threading.Channels)
-│   └── TTS/               # Eleven Labs API client (ElevenLabsTtsService, CachedTtsService decorator)
+│   ├── TTS/               # Eleven Labs API client (ElevenLabsTtsService, CachedTtsService decorator)
+│   ├── MessageProcessingService.cs      # Message processing logic (sanitization, truncation, queue item creation)
+│   ├── PromptOrchestrationService.cs    # NPC prompt pipeline (selection, LLM call, history, TTS queueing)
+│   └── VoiceChannelResolverService.cs   # Three-step voice channel resolution (explicit → user → default)
 ├── Utilities/             # Text sanitization utilities
 └── Program.cs             # Host builder and DI configuration
 ```
@@ -176,6 +179,7 @@ src/ErosTTS.Bot/
 - **DI**: All services registered in `Program.cs` ConfigureServices
 - **Persistence**: Config-driven provider selection (`Database:Provider`): `InMemory` (default, ConcurrentDictionary), `Sqlite` (EF Core), or `Postgres` (future). EF services use `IDbContextFactory<T>` to stay singleton-compatible.
 - **Decorator pattern**: `CachedTtsService` decorates `ElevenLabsTtsService` to provide transparent disk caching of TTS audio. Cache keys use SHA256 hash of text+voiceId+modelId+outputFormat. Enabled by default via `TtsCache:Enabled` configuration.
+- **Service extraction for testability**: Complex logic extracted from commands and hosted services into dedicated service interfaces (`IMessageProcessingService`, `IPromptOrchestrationService`, `IVoiceChannelResolverService`) to enable unit testing without Discord dependencies.
 - **Async throughout**: Methods return `Task` or `Task<T>`
 
 ## Configuration Modes
