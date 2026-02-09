@@ -68,7 +68,7 @@ public sealed class PromptOrchestrationServiceTests
         SetupSettings();
         _npcService.ListNpcsAsync(GuildId).Returns(Array.Empty<NpcDefinition>().AsReadOnly());
 
-        var act = () => sut.HandlePromptAsync(GuildId, VoiceChannelId, "Hello");
+        var act = () => sut.HandlePromptAsync(GuildId, VoiceChannelId, "Hello", default);
 
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*No NPCs*");
@@ -85,7 +85,7 @@ public sealed class PromptOrchestrationServiceTests
         _llmService.GetCompletionAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<ConversationMessage>>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns("Response from Alice");
 
-        var result = await sut.HandlePromptAsync(GuildId, VoiceChannelId, "Hello");
+        var result = await sut.HandlePromptAsync(GuildId, VoiceChannelId, "Hello", default);
 
         result.NpcName.Should().Be("Alice");
     }
@@ -101,7 +101,7 @@ public sealed class PromptOrchestrationServiceTests
         _llmService.GetCompletionAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<ConversationMessage>>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns("Response from Bob");
 
-        var result = await sut.HandlePromptAsync(GuildId, VoiceChannelId, "Hello");
+        var result = await sut.HandlePromptAsync(GuildId, VoiceChannelId, "Hello", default);
 
         result.NpcName.Should().Be("Bob");
     }
@@ -116,7 +116,7 @@ public sealed class PromptOrchestrationServiceTests
         _llmService.GetCompletionAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<ConversationMessage>>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns("Response");
 
-        var result = await sut.HandlePromptAsync(GuildId, VoiceChannelId, "Hello");
+        var result = await sut.HandlePromptAsync(GuildId, VoiceChannelId, "Hello", default);
 
         result.NpcName.Should().Be("Alice");
     }
@@ -134,7 +134,7 @@ public sealed class PromptOrchestrationServiceTests
         _llmService.GetCompletionAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<ConversationMessage>>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns("Response from Bob");
 
-        var result = await sut.HandlePromptAsync(GuildId, VoiceChannelId, "Hello");
+        var result = await sut.HandlePromptAsync(GuildId, VoiceChannelId, "Hello", default);
 
         result.NpcName.Should().Be("Bob");
         await _selectionService.Received(1).SelectNpcAsync(
@@ -151,7 +151,7 @@ public sealed class PromptOrchestrationServiceTests
         _llmService.GetCompletionAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<ConversationMessage>>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns("Response");
 
-        var result = await sut.HandlePromptAsync(GuildId, VoiceChannelId, "Hello");
+        var result = await sut.HandlePromptAsync(GuildId, VoiceChannelId, "Hello", default);
 
         result.NpcName.Should().Be("Alice");
         await _selectionService.DidNotReceive().SelectNpcAsync(
@@ -170,7 +170,7 @@ public sealed class PromptOrchestrationServiceTests
         _llmService.GetCompletionAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<ConversationMessage>>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns("Response");
 
-        await sut.HandlePromptAsync(GuildId, VoiceChannelId, "Hello");
+        await sut.HandlePromptAsync(GuildId, VoiceChannelId, "Hello", default);
 
         // Should get history with npcId = 1
         await _npcService.Received(1).GetHistoryAsync(GuildId, 1);
@@ -186,7 +186,7 @@ public sealed class PromptOrchestrationServiceTests
         _llmService.GetCompletionAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<ConversationMessage>>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns("Response");
 
-        await sut.HandlePromptAsync(GuildId, VoiceChannelId, "Hello");
+        await sut.HandlePromptAsync(GuildId, VoiceChannelId, "Hello", default);
 
         // Should get history with null npcId (shared)
         await _npcService.Received(1).GetHistoryAsync(GuildId, null);
@@ -215,7 +215,7 @@ public sealed class PromptOrchestrationServiceTests
                 return "Response";
             });
 
-        await sut.HandlePromptAsync(GuildId, VoiceChannelId, "Hello");
+        await sut.HandlePromptAsync(GuildId, VoiceChannelId, "Hello", default);
 
         capturedHistory.Should().NotBeNull();
         capturedHistory![0].Content.Should().Be("[Alice]: I am Alice");
@@ -234,7 +234,7 @@ public sealed class PromptOrchestrationServiceTests
         _llmService.GetCompletionAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<ConversationMessage>>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns("I am Alice!");
 
-        await sut.HandlePromptAsync(GuildId, VoiceChannelId, "Who are you?");
+        await sut.HandlePromptAsync(GuildId, VoiceChannelId, "Who are you?", default);
 
         await _npcService.Received(1).AddMessageAsync(GuildId, null, null, "user", "Who are you?");
         await _npcService.Received(1).AddMessageAsync(GuildId, 1, "Alice", "assistant", "I am Alice!");
@@ -252,7 +252,7 @@ public sealed class PromptOrchestrationServiceTests
         _llmService.GetCompletionAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<ConversationMessage>>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns("Check this **bold** text with https://example.com link");
 
-        var result = await sut.HandlePromptAsync(GuildId, VoiceChannelId, "Hi");
+        var result = await sut.HandlePromptAsync(GuildId, VoiceChannelId, "Hi", default);
 
         result.QueueItem.Text.Should().Be("Check this bold text with link");
     }
@@ -267,7 +267,7 @@ public sealed class PromptOrchestrationServiceTests
         _llmService.GetCompletionAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<ConversationMessage>>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns("https://example.com"); // gets fully stripped
 
-        var result = await sut.HandlePromptAsync(GuildId, VoiceChannelId, "Hi");
+        var result = await sut.HandlePromptAsync(GuildId, VoiceChannelId, "Hi", default);
 
         result.QueueItem.Text.Should().Be("I have nothing to say.");
     }
@@ -282,7 +282,7 @@ public sealed class PromptOrchestrationServiceTests
         _llmService.GetCompletionAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<ConversationMessage>>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns("This is a very long response that should be truncated");
 
-        var result = await sut.HandlePromptAsync(GuildId, VoiceChannelId, "Hi");
+        var result = await sut.HandlePromptAsync(GuildId, VoiceChannelId, "Hi", default);
 
         result.QueueItem.Text.Should().HaveLength(10);
     }
@@ -297,7 +297,7 @@ public sealed class PromptOrchestrationServiceTests
         _llmService.GetCompletionAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<ConversationMessage>>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns("Hello!");
 
-        var result = await sut.HandlePromptAsync(GuildId, VoiceChannelId, "Hi");
+        var result = await sut.HandlePromptAsync(GuildId, VoiceChannelId, "Hi", default);
 
         result.QueueItem.VoiceId.Should().Be("alice-voice-123");
         result.QueueItem.GuildId.Should().Be(GuildId);
@@ -315,7 +315,7 @@ public sealed class PromptOrchestrationServiceTests
         _llmService.GetCompletionAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<ConversationMessage>>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns("Full response text here");
 
-        var result = await sut.HandlePromptAsync(GuildId, VoiceChannelId, "Hi");
+        var result = await sut.HandlePromptAsync(GuildId, VoiceChannelId, "Hi", default);
 
         result.Response.Should().Be("Full response text here");
     }
@@ -336,7 +336,7 @@ public sealed class PromptOrchestrationServiceTests
                 return "Response";
             });
 
-        await sut.HandlePromptAsync(GuildId, VoiceChannelId, "Hello");
+        await sut.HandlePromptAsync(GuildId, VoiceChannelId, "Hello", default);
 
         capturedSystemPrompt.Should().Be("You are Alice");
     }
@@ -349,9 +349,9 @@ public sealed class PromptOrchestrationServiceTests
         SetupDefaultNpcs(npc1);
         SetupSettings(activeNpcId: 1);
         _llmService.GetCompletionAsync(Arg.Any<string>(), Arg.Any<IReadOnlyList<ConversationMessage>>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .ThrowsAsync(new LlmServiceException("Service unavailable"));
+            .Returns(Task.FromException<string>(new LlmServiceException("Service unavailable")));
 
-        var act = () => sut.HandlePromptAsync(GuildId, VoiceChannelId, "Hi");
+        var act = () => sut.HandlePromptAsync(GuildId, VoiceChannelId, "Hi", default);
 
         await act.Should().ThrowAsync<LlmServiceException>()
             .WithMessage("Service unavailable");

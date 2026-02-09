@@ -172,7 +172,7 @@ public sealed class TtsProcessorServiceTests
         _ttsService.SynthesizeAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(audioStream);
         _audioService.PlayAudioAsync(Arg.Any<ulong>(), Arg.Any<ulong>(), Arg.Any<Stream>(), Arg.Any<CancellationToken>())
-            .ThrowsAsync(new VoiceConnectionException("test"));
+            .Returns(Task.FromException(new VoiceConnectionException("test")));
 
         var act = () => sut.ProcessItemAsync(CreateTestItem(), CancellationToken.None);
 
