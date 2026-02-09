@@ -31,4 +31,12 @@ internal interface IVoiceChannelInspector
     /// Gets the IDs of all guilds where the bot is currently connected to voice.
     /// </summary>
     IReadOnlyCollection<ulong> GetConnectedGuildIds();
+
+    /// <summary>
+    /// Gets the voice channel ID that a user is currently in for the specified guild.
+    /// </summary>
+    /// <param name="guildId">The guild ID.</param>
+    /// <param name="userId">The user ID.</param>
+    /// <returns>The channel ID, or null if the user is not in a voice channel.</returns>
+    ulong? GetUserVoiceChannelId(ulong guildId, ulong userId);
 }

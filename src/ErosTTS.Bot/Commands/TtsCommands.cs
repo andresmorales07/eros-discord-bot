@@ -1,4 +1,5 @@
 using ErosTTS.Bot.Configuration;
+using ErosTTS.Bot.Services;
 using ErosTTS.Bot.Services.Audio;
 using ErosTTS.Bot.Services.Guild;
 using ErosTTS.Bot.Services.Queue;
@@ -6,7 +7,6 @@ using ErosTTS.Bot.Utilities;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NetCord;
-using NetCord.Gateway;
 using NetCord.Rest;
 using NetCord.Services.ApplicationCommands;
 
@@ -20,7 +20,7 @@ public sealed class TtsCommands : ApplicationCommandModule<ApplicationCommandCon
     private readonly IGuildConfigurationService _guildConfig;
     private readonly IAudioService _audioService;
     private readonly ITtsQueue _queue;
-    private readonly GatewayClient _gatewayClient;
+    private readonly IVoiceChannelResolverService _voiceResolver;
     private readonly BotConfiguration _botConfig;
     private readonly ILogger<TtsCommands> _logger;
 
@@ -28,14 +28,14 @@ public sealed class TtsCommands : ApplicationCommandModule<ApplicationCommandCon
         IGuildConfigurationService guildConfig,
         IAudioService audioService,
         ITtsQueue queue,
-        GatewayClient gatewayClient,
+        IVoiceChannelResolverService voiceResolver,
         IOptions<BotConfiguration> botConfig,
         ILogger<TtsCommands> logger)
     {
         _guildConfig = guildConfig;
         _audioService = audioService;
         _queue = queue;
-        _gatewayClient = gatewayClient;
+        _voiceResolver = voiceResolver;
         _botConfig = botConfig.Value;
         _logger = logger;
     }
@@ -61,35 +61,19 @@ public sealed class TtsCommands : ApplicationCommandModule<ApplicationCommandCon
             return;
         }
 
-        // Resolve voice channel
-        ulong resolvedVoiceChannelId;
-        if (voiceChannel != null)
+        // Resolve voice channel via three-step fallback
+        var resolvedChannelId = await _voiceResolver.ResolveVoiceChannelAsync(
+            guildId.Value,
+            Context.User.Id,
+            voiceChannel?.Id);
+
+        if (!resolvedChannelId.HasValue)
         {
-            resolvedVoiceChannelId = voiceChannel.Id;
+            await RespondEphemeralAsync("Please join a voice channel or specify one with the voice-channel parameter.");
+            return;
         }
-        else
-        {
-            // Try to get user's current voice channel from cache
-            var userVoiceChannelId = GetUserVoiceChannel(guildId.Value, Context.User.Id);
-            if (userVoiceChannelId.HasValue)
-            {
-                resolvedVoiceChannelId = userVoiceChannelId.Value;
-            }
-            else
-            {
-                // Fall back to configured default
-                var config = await _guildConfig.GetConfigurationAsync(guildId.Value);
-                if (config?.VoiceChannelId.HasValue == true)
-                {
-                    resolvedVoiceChannelId = config.VoiceChannelId.Value;
-                }
-                else
-                {
-                    await RespondEphemeralAsync("Please join a voice channel or specify one with the voice-channel parameter.");
-                    return;
-                }
-            }
-        }
+
+        var resolvedVoiceChannelId = resolvedChannelId.Value;
 
         // Sanitize text
         var sanitizedText = TextSanitizer.Sanitize(text);
@@ -125,18 +109,6 @@ public sealed class TtsCommands : ApplicationCommandModule<ApplicationCommandCon
 
         var preview = sanitizedText.Length > 100 ? sanitizedText[..100] + "..." : sanitizedText;
         await RespondEphemeralAsync($"Queued TTS in <#{resolvedVoiceChannelId}>: \"{preview}\"");
-    }
-
-    private ulong? GetUserVoiceChannel(ulong guildId, ulong userId)
-    {
-        if (_gatewayClient.Cache.Guilds.TryGetValue(guildId, out var guild))
-        {
-            if (guild.VoiceStates.TryGetValue(userId, out var voiceState))
-            {
-                return voiceState.ChannelId;
-            }
-        }
-        return null;
     }
 
     [SlashCommand("tts-setup", "Configure default TTS voice channel for this server")]
