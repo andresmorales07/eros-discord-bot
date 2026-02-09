@@ -60,7 +60,7 @@ public class CachedTtsServiceTests : IDisposable
         result.Should().NotBeNull();
         result.Position.Should().Be(0);
         var buffer = new byte[3];
-        await result.ReadAsync(buffer);
+        await result.ReadExactlyAsync(buffer);
         buffer.Should().BeEquivalentTo(audioData);
 
         await _innerService.Received(1).SynthesizeAsync("hello", null, Arg.Any<CancellationToken>());
@@ -90,7 +90,7 @@ public class CachedTtsServiceTests : IDisposable
         result.Should().NotBeNull();
         result.Position.Should().Be(0);
         var buffer = new byte[3];
-        await result.ReadAsync(buffer);
+        await result.ReadExactlyAsync(buffer);
         buffer.Should().BeEquivalentTo(audioData);
 
         await _innerService.DidNotReceive().SynthesizeAsync(
