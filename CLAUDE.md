@@ -209,8 +209,7 @@ All commands respond with ephemeral messages (only visible to the user) except `
 
 ### TTS Commands (all ephemeral)
 - `/say <text> [voice-channel]` - Speak text in voice channel
-- `/tts-setup <voice-channel> [text-channel] [voice-id]` - Configure defaults (Manage Guild permission)
-- `/tts-provider <provider>` - Set TTS provider for this guild: ElevenLabs or OpenAI (Manage Guild permission)
+- `/tts-config [voice-channel] [text-channel] [voice-id] [provider]` - Configure TTS settings; at least one option required (Manage Guild permission)
 - `/tts-stop` - Disconnect from voice
 - `/tts-status` - Show current configuration (including voice ID and TTS provider)
 - `/tts-clear` - Remove configuration (Manage Guild permission)

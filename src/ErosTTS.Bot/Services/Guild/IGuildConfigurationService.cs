@@ -35,6 +35,12 @@ public interface IGuildConfigurationService
     Task SetTtsProviderAsync(ulong guildId, string? providerName);
 
     /// <summary>
+    /// Updates specific fields of a guild's TTS configuration.
+    /// Null values mean "don't change this field".
+    /// </summary>
+    Task UpdateConfigurationAsync(ulong guildId, ulong? voiceChannelId, ulong? textChannelId, string? voiceId, string? providerName);
+
+    /// <summary>
     /// Gets all configured guilds.
     /// </summary>
     /// <returns>A collection of all guild configurations.</returns>

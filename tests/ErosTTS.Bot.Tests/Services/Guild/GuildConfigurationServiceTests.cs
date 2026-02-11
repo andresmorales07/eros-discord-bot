@@ -177,4 +177,91 @@ public class GuildConfigurationServiceTests
         result.Should().NotBeNull();
         result!.TtsProvider.Should().BeNull();
     }
+
+    [Fact]
+    public async Task UpdateConfigurationAsync_UpdatesOnlyVoiceChannel_PreservesOtherFields()
+    {
+        await _sut.SetChannelsAsync(111UL, 10UL, 20UL, "voice-1");
+        await _sut.SetTtsProviderAsync(111UL, "OpenAI");
+
+        await _sut.UpdateConfigurationAsync(111UL, voiceChannelId: 99UL, textChannelId: null, voiceId: null, providerName: null);
+
+        var result = await _sut.GetConfigurationAsync(111UL);
+        result.Should().NotBeNull();
+        result!.VoiceChannelId.Should().Be(99UL);
+        result.TextChannelId.Should().Be(10UL);
+        result.VoiceId.Should().Be("voice-1");
+        result.TtsProvider.Should().Be("OpenAI");
+    }
+
+    [Fact]
+    public async Task UpdateConfigurationAsync_UpdatesOnlyProvider_PreservesOtherFields()
+    {
+        await _sut.SetChannelsAsync(111UL, 10UL, 20UL, "voice-1");
+
+        await _sut.UpdateConfigurationAsync(111UL, voiceChannelId: null, textChannelId: null, voiceId: null, providerName: "OpenAI");
+
+        var result = await _sut.GetConfigurationAsync(111UL);
+        result.Should().NotBeNull();
+        result!.VoiceChannelId.Should().Be(20UL);
+        result.TextChannelId.Should().Be(10UL);
+        result.VoiceId.Should().Be("voice-1");
+        result.TtsProvider.Should().Be("OpenAI");
+    }
+
+    [Fact]
+    public async Task UpdateConfigurationAsync_UpdatesMultipleFields()
+    {
+        await _sut.SetChannelsAsync(111UL, 10UL, 20UL);
+
+        await _sut.UpdateConfigurationAsync(111UL, voiceChannelId: 50UL, textChannelId: null, voiceId: "new-voice", providerName: "OpenAI");
+
+        var result = await _sut.GetConfigurationAsync(111UL);
+        result.Should().NotBeNull();
+        result!.VoiceChannelId.Should().Be(50UL);
+        result.TextChannelId.Should().Be(10UL);
+        result.VoiceId.Should().Be("new-voice");
+        result.TtsProvider.Should().Be("OpenAI");
+    }
+
+    [Fact]
+    public async Task UpdateConfigurationAsync_CreatesConfigWhenNoneExists()
+    {
+        await _sut.UpdateConfigurationAsync(111UL, voiceChannelId: 50UL, textChannelId: null, voiceId: null, providerName: null);
+
+        var result = await _sut.GetConfigurationAsync(111UL);
+        result.Should().NotBeNull();
+        result!.VoiceChannelId.Should().Be(50UL);
+        result.TextChannelId.Should().BeNull();
+        result.VoiceId.Should().BeNull();
+        result.TtsProvider.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task UpdateConfigurationAsync_PreservesFieldsSetBySetChannels()
+    {
+        await _sut.SetChannelsAsync(111UL, 10UL, 20UL, "voice-1");
+
+        await _sut.UpdateConfigurationAsync(111UL, voiceChannelId: null, textChannelId: 30UL, voiceId: null, providerName: null);
+
+        var result = await _sut.GetConfigurationAsync(111UL);
+        result.Should().NotBeNull();
+        result!.VoiceChannelId.Should().Be(20UL);
+        result.TextChannelId.Should().Be(30UL);
+        result.VoiceId.Should().Be("voice-1");
+    }
+
+    [Fact]
+    public async Task UpdateConfigurationAsync_UpdatesTimestamp()
+    {
+        await _sut.SetChannelsAsync(111UL, 10UL, 20UL);
+        var configBefore = await _sut.GetConfigurationAsync(111UL);
+        var timestampBefore = configBefore!.UpdatedAt;
+
+        await Task.Delay(10);
+        await _sut.UpdateConfigurationAsync(111UL, voiceChannelId: 50UL, textChannelId: null, voiceId: null, providerName: null);
+
+        var result = await _sut.GetConfigurationAsync(111UL);
+        result!.UpdatedAt.Should().BeAfter(timestampBefore);
+    }
 }

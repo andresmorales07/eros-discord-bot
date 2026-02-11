@@ -64,6 +64,35 @@ public sealed class GuildConfigurationService : IGuildConfigurationService
         return Task.CompletedTask;
     }
 
+    public Task UpdateConfigurationAsync(ulong guildId, ulong? voiceChannelId, ulong? textChannelId, string? voiceId, string? providerName)
+    {
+        _configurations.AddOrUpdate(
+            guildId,
+            _ => new GuildTtsConfiguration
+            {
+                GuildId = guildId,
+                VoiceChannelId = voiceChannelId,
+                TextChannelId = textChannelId,
+                VoiceId = voiceId,
+                TtsProvider = providerName,
+                UpdatedAt = DateTimeOffset.UtcNow
+            },
+            (_, existing) => existing with
+            {
+                VoiceChannelId = voiceChannelId ?? existing.VoiceChannelId,
+                TextChannelId = textChannelId ?? existing.TextChannelId,
+                VoiceId = voiceId ?? existing.VoiceId,
+                TtsProvider = providerName ?? existing.TtsProvider,
+                UpdatedAt = DateTimeOffset.UtcNow
+            });
+
+        _logger.LogInformation(
+            "Updated TTS configuration for guild {GuildId}: voiceChannel={VoiceChannel}, textChannel={TextChannel}, voiceId={VoiceId}, provider={Provider}",
+            guildId, voiceChannelId, textChannelId, voiceId, providerName);
+
+        return Task.CompletedTask;
+    }
+
     public Task RemoveConfigurationAsync(ulong guildId)
     {
         if (_configurations.TryRemove(guildId, out _))

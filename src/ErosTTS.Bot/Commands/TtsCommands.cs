@@ -115,20 +115,27 @@ public sealed class TtsCommands : ApplicationCommandModule<ApplicationCommandCon
         await RespondEphemeralAsync($"Queued TTS in <#{resolvedVoiceChannelId}>: \"{preview}\"");
     }
 
-    [SlashCommand("tts-setup", "Configure default TTS voice channel for this server")]
-    public async Task SetupAsync(
+    [SlashCommand("tts-config", "Configure TTS settings for this server (provide at least one option)")]
+    public async Task ConfigAsync(
         [SlashCommandParameter(Name = "voice-channel", Description = "Default voice channel for TTS playback")]
-        VoiceGuildChannel voiceChannel,
+        VoiceGuildChannel? voiceChannel = null,
         [SlashCommandParameter(Name = "text-channel", Description = "Channel to monitor for auto-TTS (only works if text monitoring is enabled)")]
         TextGuildChannel? textChannel = null,
-        [SlashCommandParameter(Name = "voice-id", Description = "ElevenLabs voice ID (leave empty for default)")]
-        string? voiceId = null)
+        [SlashCommandParameter(Name = "voice-id", Description = "TTS voice ID (leave empty for default)")]
+        string? voiceId = null,
+        [SlashCommandParameter(Name = "provider", Description = "TTS provider name (e.g. ElevenLabs, OpenAI)")]
+        string? provider = null)
     {
-        // Check permissions
         var guildId = Context.Interaction.GuildId;
         if (guildId is null)
         {
             await RespondEphemeralAsync("This command can only be used in a server.");
+            return;
+        }
+
+        if (voiceChannel is null && textChannel is null && voiceId is null && provider is null)
+        {
+            await RespondEphemeralAsync("Please provide at least one option to update.");
             return;
         }
 
@@ -139,26 +146,44 @@ public sealed class TtsCommands : ApplicationCommandModule<ApplicationCommandCon
             return;
         }
 
-        await _guildConfig.SetChannelsAsync(
+        // Validate provider if specified
+        if (provider is not null)
+        {
+            var resolved = _providerFactory.GetProviderByName(provider);
+            if (resolved is null)
+            {
+                var available = string.Join(", ", _providerFactory.GetAvailableProviders());
+                await RespondEphemeralAsync($"Unknown provider `{provider}`. Available providers: {available}");
+                return;
+            }
+            provider = resolved.ProviderName;
+        }
+
+        await _guildConfig.UpdateConfigurationAsync(
             guildId.Value,
-            textChannel?.Id ?? 0,
-            voiceChannel.Id,
-            voiceId);
+            voiceChannel?.Id,
+            textChannel?.Id,
+            voiceId,
+            provider);
 
         _logger.LogInformation(
-            "User {UserId} ({Username}) configured TTS for guild {GuildId}: text={TextChannel}, voice={VoiceChannel}, voiceId={VoiceId}",
-            Context.User.Id, Context.User.Username, guildId.Value, textChannel?.Id ?? 0, voiceChannel.Id, voiceId ?? "(default)");
+            "User {UserId} ({Username}) updated TTS config for guild {GuildId}: voiceChannel={VoiceChannel}, textChannel={TextChannel}, voiceId={VoiceId}, provider={Provider}",
+            Context.User.Id, Context.User.Username, guildId.Value, voiceChannel?.Id, textChannel?.Id, voiceId, provider);
 
-        var response = $"**TTS Configuration Updated**\nDefault Voice Channel: <#{voiceChannel.Id}>";
-        response += $"\nVoice ID: `{voiceId ?? "Default"}`";
-        if (textChannel != null)
+        var response = "**TTS Configuration Updated**";
+        if (voiceChannel is not null)
+            response += $"\nVoice Channel: <#{voiceChannel.Id}>";
+        if (textChannel is not null)
         {
-            response += $"\nText Channel Monitoring: <#{textChannel.Id}>";
+            response += $"\nText Channel: <#{textChannel.Id}>";
             if (!_botConfig.EnableTextChannelMonitoring)
-            {
                 response += " (note: text monitoring is currently disabled in bot config)";
-            }
         }
+        if (voiceId is not null)
+            response += $"\nVoice ID: `{voiceId}`";
+        if (provider is not null)
+            response += $"\nTTS Provider: **{provider}**";
+
         await RespondEphemeralAsync(response);
     }
 
@@ -208,7 +233,7 @@ public sealed class TtsCommands : ApplicationCommandModule<ApplicationCommandCon
             await RespondEphemeralAsync($"**TTS Bot Status**\n" +
                    $"Mode: {mode}\n" +
                    $"Configuration: Not set up\n\n" +
-                   "Use `/say` to speak text, or `/tts-setup` to configure a default voice channel.");
+                   "Use `/say` to speak text, or `/tts-config` to configure TTS settings.");
             return;
         }
 
@@ -236,42 +261,6 @@ public sealed class TtsCommands : ApplicationCommandModule<ApplicationCommandCon
         response += $"\nLast Updated: {config.UpdatedAt:g}";
 
         await RespondEphemeralAsync(response);
-    }
-
-    [SlashCommand("tts-provider", "Set the TTS provider for this server")]
-    public async Task ProviderAsync(
-        [SlashCommandParameter(Name = "provider", Description = "TTS provider name (e.g. ElevenLabs, OpenAI)")]
-        string provider)
-    {
-        var guildId = Context.Interaction.GuildId;
-        if (guildId is null)
-        {
-            await RespondEphemeralAsync("This command can only be used in a server.");
-            return;
-        }
-
-        var member = Context.User as GuildInteractionUser;
-        if (member is null || !member.Permissions.HasFlag(Permissions.ManageGuild))
-        {
-            await RespondEphemeralAsync("You need the Manage Server permission to use this command.");
-            return;
-        }
-
-        var resolved = _providerFactory.GetProviderByName(provider);
-        if (resolved is null)
-        {
-            var available = string.Join(", ", _providerFactory.GetAvailableProviders());
-            await RespondEphemeralAsync($"Unknown provider `{provider}`. Available providers: {available}");
-            return;
-        }
-
-        await _guildConfig.SetTtsProviderAsync(guildId.Value, resolved.ProviderName);
-
-        _logger.LogInformation(
-            "User {UserId} ({Username}) set TTS provider for guild {GuildId} to {Provider}",
-            Context.User.Id, Context.User.Username, guildId.Value, resolved.ProviderName);
-
-        await RespondEphemeralAsync($"TTS provider set to **{resolved.ProviderName}**.");
     }
 
     [SlashCommand("tts-clear", "Clear the TTS configuration for this server")]

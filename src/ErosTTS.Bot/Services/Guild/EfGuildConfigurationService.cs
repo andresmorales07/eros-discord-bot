@@ -77,6 +77,36 @@ public sealed class EfGuildConfigurationService : IGuildConfigurationService
             guildId, providerName ?? "(default)");
     }
 
+    public async Task UpdateConfigurationAsync(ulong guildId, ulong? voiceChannelId, ulong? textChannelId, string? voiceId, string? providerName)
+    {
+        await using var db = await _factory.CreateDbContextAsync();
+        var storedId = DiscordIdConverter.ToLong(guildId);
+
+        var entity = await db.GuildConfigurations.FindAsync(storedId);
+        if (entity is null)
+        {
+            entity = new GuildTtsConfigurationEntity { GuildId = storedId };
+            db.GuildConfigurations.Add(entity);
+        }
+
+        if (voiceChannelId.HasValue)
+            entity.VoiceChannelId = DiscordIdConverter.ToLong(voiceChannelId.Value);
+        if (textChannelId.HasValue)
+            entity.TextChannelId = DiscordIdConverter.ToLong(textChannelId.Value);
+        if (voiceId is not null)
+            entity.VoiceId = voiceId;
+        if (providerName is not null)
+            entity.TtsProvider = providerName;
+
+        entity.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await db.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "Updated TTS configuration for guild {GuildId}: voiceChannel={VoiceChannel}, textChannel={TextChannel}, voiceId={VoiceId}, provider={Provider}",
+            guildId, voiceChannelId, textChannelId, voiceId, providerName);
+    }
+
     public async Task RemoveConfigurationAsync(ulong guildId)
     {
         await using var db = await _factory.CreateDbContextAsync();
