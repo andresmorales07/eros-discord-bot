@@ -72,7 +72,7 @@ public sealed class AudioService : IAudioService, IAsyncDisposable
             }, ct);
 
             // Create output stream for sending voice to Discord
-            var outStream = voiceClient.CreateOutputStream();
+            var outStream = voiceClient.CreateVoiceStream();
 
             // Create Opus encode stream wrapping the output stream
             // This converts PCM to Opus format that Discord expects
