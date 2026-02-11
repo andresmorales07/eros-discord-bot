@@ -23,6 +23,7 @@ public sealed class ErosTtsDbContext : DbContext
             entity.HasKey(e => e.GuildId);
             entity.Property(e => e.GuildId).ValueGeneratedNever();
             entity.Property(e => e.VoiceId).HasMaxLength(100);
+            entity.Property(e => e.TtsProvider).HasMaxLength(50);
         });
 
         modelBuilder.Entity<NpcEntity>(entity =>

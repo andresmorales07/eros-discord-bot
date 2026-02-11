@@ -3,6 +3,7 @@ using ErosTTS.Bot.Services;
 using ErosTTS.Bot.Services.Audio;
 using ErosTTS.Bot.Services.Guild;
 using ErosTTS.Bot.Services.Queue;
+using ErosTTS.Bot.Services.TTS;
 using ErosTTS.Bot.Utilities;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -21,6 +22,7 @@ public sealed class TtsCommands : ApplicationCommandModule<ApplicationCommandCon
     private readonly IAudioService _audioService;
     private readonly ITtsQueue _queue;
     private readonly IVoiceChannelResolverService _voiceResolver;
+    private readonly ITtsProviderFactory _providerFactory;
     private readonly BotConfiguration _botConfig;
     private readonly ILogger<TtsCommands> _logger;
 
@@ -29,6 +31,7 @@ public sealed class TtsCommands : ApplicationCommandModule<ApplicationCommandCon
         IAudioService audioService,
         ITtsQueue queue,
         IVoiceChannelResolverService voiceResolver,
+        ITtsProviderFactory providerFactory,
         IOptions<BotConfiguration> botConfig,
         ILogger<TtsCommands> logger)
     {
@@ -36,6 +39,7 @@ public sealed class TtsCommands : ApplicationCommandModule<ApplicationCommandCon
         _audioService = audioService;
         _queue = queue;
         _voiceResolver = voiceResolver;
+        _providerFactory = providerFactory;
         _botConfig = botConfig.Value;
         _logger = logger;
     }
@@ -214,9 +218,11 @@ public sealed class TtsCommands : ApplicationCommandModule<ApplicationCommandCon
         var voiceChannel = config.VoiceChannelId.HasValue ? $"<#{config.VoiceChannelId}>" : "Not set";
         var connectedStatus = isConnected ? "Yes" : "No";
         var voiceIdDisplay = config.VoiceId ?? "Default";
+        var providerDisplay = config.TtsProvider ?? "ElevenLabs";
 
         var response = $"**TTS Bot Status**\n" +
                        $"Mode: {mode}\n" +
+                       $"TTS Provider: {providerDisplay}\n" +
                        $"Default Voice Channel: {voiceChannel}\n" +
                        $"Voice ID: `{voiceIdDisplay}`\n" +
                        $"Voice Connected: {connectedStatus}\n" +
@@ -230,6 +236,42 @@ public sealed class TtsCommands : ApplicationCommandModule<ApplicationCommandCon
         response += $"\nLast Updated: {config.UpdatedAt:g}";
 
         await RespondEphemeralAsync(response);
+    }
+
+    [SlashCommand("tts-provider", "Set the TTS provider for this server")]
+    public async Task ProviderAsync(
+        [SlashCommandParameter(Name = "provider", Description = "TTS provider name (e.g. ElevenLabs, OpenAI)")]
+        string provider)
+    {
+        var guildId = Context.Interaction.GuildId;
+        if (guildId is null)
+        {
+            await RespondEphemeralAsync("This command can only be used in a server.");
+            return;
+        }
+
+        var member = Context.User as GuildInteractionUser;
+        if (member is null || !member.Permissions.HasFlag(Permissions.ManageGuild))
+        {
+            await RespondEphemeralAsync("You need the Manage Server permission to use this command.");
+            return;
+        }
+
+        var resolved = _providerFactory.GetProviderByName(provider);
+        if (resolved is null)
+        {
+            var available = string.Join(", ", _providerFactory.GetAvailableProviders());
+            await RespondEphemeralAsync($"Unknown provider `{provider}`. Available providers: {available}");
+            return;
+        }
+
+        await _guildConfig.SetTtsProviderAsync(guildId.Value, resolved.ProviderName);
+
+        _logger.LogInformation(
+            "User {UserId} ({Username}) set TTS provider for guild {GuildId} to {Provider}",
+            Context.User.Id, Context.User.Username, guildId.Value, resolved.ProviderName);
+
+        await RespondEphemeralAsync($"TTS provider set to **{resolved.ProviderName}**.");
     }
 
     [SlashCommand("tts-clear", "Clear the TTS configuration for this server")]

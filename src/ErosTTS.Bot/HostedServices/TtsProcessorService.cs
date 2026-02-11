@@ -17,7 +17,7 @@ namespace ErosTTS.Bot.HostedServices;
 public sealed class TtsProcessorService : BackgroundService
 {
     private readonly ITtsQueue _queue;
-    private readonly ITtsService _ttsService;
+    private readonly ITtsProviderFactory _providerFactory;
     private readonly IAudioService _audioService;
     private readonly IGuildConfigurationService _guildConfig;
     private readonly GatewayClient _gatewayClient;
@@ -26,7 +26,7 @@ public sealed class TtsProcessorService : BackgroundService
 
     public TtsProcessorService(
         ITtsQueue queue,
-        ITtsService ttsService,
+        ITtsProviderFactory providerFactory,
         IAudioService audioService,
         IGuildConfigurationService guildConfig,
         GatewayClient gatewayClient,
@@ -34,7 +34,7 @@ public sealed class TtsProcessorService : BackgroundService
         ILogger<TtsProcessorService> logger)
     {
         _queue = queue;
-        _ttsService = ttsService;
+        _providerFactory = providerFactory;
         _audioService = audioService;
         _guildConfig = guildConfig;
         _gatewayClient = gatewayClient;
@@ -129,14 +129,17 @@ public sealed class TtsProcessorService : BackgroundService
             return;
         }
 
+        // Resolve TTS provider for this guild
+        var provider = await _providerFactory.GetProviderAsync(item.GuildId);
+
         // Generate TTS audio — NPC voice overrides guild voice
         Stream? audioStream = null;
         try
         {
             var voiceId = item.VoiceId ?? config.VoiceId;
-            _logger.LogDebug("Generating TTS audio for {CharCount} characters using voice {VoiceId}",
-                item.Text.Length, voiceId ?? "(default)");
-            audioStream = await _ttsService.SynthesizeAsync(item.Text, voiceId, ct);
+            _logger.LogDebug("Generating TTS audio for {CharCount} characters using voice {VoiceId} via {Provider}",
+                item.Text.Length, voiceId ?? "(default)", provider.ProviderName);
+            audioStream = await provider.SynthesizeAsync(item.Text, voiceId, ct);
 
             // Play the audio
             _logger.LogDebug("Playing audio in voice channel {ChannelId}", item.VoiceChannelId);
@@ -179,7 +182,7 @@ public sealed class TtsProcessorService : BackgroundService
         }
         else if (ex is AuthenticationException)
         {
-            _logger.LogCritical("Eleven Labs API authentication failed. Check your API key.");
+            _logger.LogCritical("TTS API authentication failed. Check your API key.");
             // Don't retry auth failures
         }
         else if (ex is InvalidTextException ite)

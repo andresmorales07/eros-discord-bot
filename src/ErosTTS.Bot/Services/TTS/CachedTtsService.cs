@@ -7,24 +7,26 @@ using Microsoft.Extensions.Options;
 namespace ErosTTS.Bot.Services.TTS;
 
 /// <summary>
-/// Decorator around <see cref="ElevenLabsTtsService"/> that caches synthesized audio on disk.
+/// Decorator around an <see cref="ITtsProvider"/> that caches synthesized audio on disk.
 /// </summary>
-public sealed class CachedTtsService : ITtsService
+public sealed class CachedTtsService : ITtsProvider
 {
-    private readonly ITtsService _inner;
+    private readonly ITtsProvider _inner;
     private readonly TtsCacheConfiguration _cacheConfig;
-    private readonly ElevenLabsConfiguration _elevenLabsConfig;
     private readonly ILogger<CachedTtsService> _logger;
 
+    public string ProviderName => _inner.ProviderName;
+    public string DefaultVoiceId => _inner.DefaultVoiceId;
+    public string ModelId => _inner.ModelId;
+    public string OutputFormat => _inner.OutputFormat;
+
     public CachedTtsService(
-        ITtsService inner,
+        ITtsProvider inner,
         IOptions<TtsCacheConfiguration> cacheConfig,
-        IOptions<ElevenLabsConfiguration> elevenLabsConfig,
         ILogger<CachedTtsService> logger)
     {
         _inner = inner;
         _cacheConfig = cacheConfig.Value;
-        _elevenLabsConfig = elevenLabsConfig.Value;
         _logger = logger;
     }
 
@@ -35,8 +37,8 @@ public sealed class CachedTtsService : ITtsService
             return await _inner.SynthesizeAsync(text, voiceId, ct);
         }
 
-        var effectiveVoiceId = voiceId ?? _elevenLabsConfig.VoiceId;
-        var cacheKey = ComputeCacheKey(text, effectiveVoiceId, _elevenLabsConfig.ModelId, _elevenLabsConfig.OutputFormat);
+        var effectiveVoiceId = voiceId ?? _inner.DefaultVoiceId;
+        var cacheKey = ComputeCacheKey(_inner.ProviderName, text, effectiveVoiceId, _inner.ModelId, _inner.OutputFormat);
         var cachePath = Path.Combine(_cacheConfig.CacheDirectory, $"{cacheKey}.mp3");
 
         if (File.Exists(cachePath))
@@ -67,9 +69,9 @@ public sealed class CachedTtsService : ITtsService
         return _inner.ValidateApiKeyAsync(ct);
     }
 
-    internal static string ComputeCacheKey(string text, string voiceId, string modelId, string outputFormat)
+    internal static string ComputeCacheKey(string providerName, string text, string voiceId, string modelId, string outputFormat)
     {
-        var input = $"{text}|{voiceId}|{modelId}|{outputFormat}";
+        var input = $"{providerName}|{text}|{voiceId}|{modelId}|{outputFormat}";
         var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(input));
         return Convert.ToHexString(hashBytes).ToLowerInvariant();
     }

@@ -56,6 +56,27 @@ public sealed class EfGuildConfigurationService : IGuildConfigurationService
         return entity is null ? null : MapToDomain(entity);
     }
 
+    public async Task SetTtsProviderAsync(ulong guildId, string? providerName)
+    {
+        await using var db = await _factory.CreateDbContextAsync();
+        var storedId = DiscordIdConverter.ToLong(guildId);
+
+        var entity = await db.GuildConfigurations.FindAsync(storedId);
+        if (entity is null)
+        {
+            entity = new GuildTtsConfigurationEntity { GuildId = storedId };
+            db.GuildConfigurations.Add(entity);
+        }
+
+        entity.TtsProvider = providerName;
+        entity.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await db.SaveChangesAsync();
+
+        _logger.LogInformation("Updated TTS provider for guild {GuildId}: {Provider}",
+            guildId, providerName ?? "(default)");
+    }
+
     public async Task RemoveConfigurationAsync(ulong guildId)
     {
         await using var db = await _factory.CreateDbContextAsync();
@@ -81,6 +102,7 @@ public sealed class EfGuildConfigurationService : IGuildConfigurationService
         TextChannelId = e.TextChannelId.HasValue ? DiscordIdConverter.ToULong(e.TextChannelId.Value) : null,
         VoiceChannelId = e.VoiceChannelId.HasValue ? DiscordIdConverter.ToULong(e.VoiceChannelId.Value) : null,
         VoiceId = e.VoiceId,
+        TtsProvider = e.TtsProvider,
         UpdatedAt = e.UpdatedAt
     };
 }

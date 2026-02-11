@@ -139,4 +139,42 @@ public class GuildConfigurationServiceTests
         result.TextChannelId.Should().Be(10UL);
         result.VoiceChannelId.Should().Be(20UL);
     }
+
+    [Fact]
+    public async Task SetTtsProviderAsync_SetsProviderOnExistingConfig()
+    {
+        await _sut.SetChannelsAsync(111UL, 10UL, 20UL);
+
+        await _sut.SetTtsProviderAsync(111UL, "OpenAI");
+
+        var result = await _sut.GetConfigurationAsync(111UL);
+        result.Should().NotBeNull();
+        result!.TtsProvider.Should().Be("OpenAI");
+        // Channels should be preserved
+        result.TextChannelId.Should().Be(10UL);
+        result.VoiceChannelId.Should().Be(20UL);
+    }
+
+    [Fact]
+    public async Task SetTtsProviderAsync_CreatesConfigIfNoneExists()
+    {
+        await _sut.SetTtsProviderAsync(111UL, "OpenAI");
+
+        var result = await _sut.GetConfigurationAsync(111UL);
+        result.Should().NotBeNull();
+        result!.TtsProvider.Should().Be("OpenAI");
+    }
+
+    [Fact]
+    public async Task SetTtsProviderAsync_WithNull_ClearsProvider()
+    {
+        await _sut.SetChannelsAsync(111UL, 10UL, 20UL);
+        await _sut.SetTtsProviderAsync(111UL, "OpenAI");
+
+        await _sut.SetTtsProviderAsync(111UL, null);
+
+        var result = await _sut.GetConfigurationAsync(111UL);
+        result.Should().NotBeNull();
+        result!.TtsProvider.Should().BeNull();
+    }
 }

@@ -10,6 +10,9 @@ services:
       - EROSTTS_Discord__Token=${DISCORD_TOKEN}
       - EROSTTS_ElevenLabs__ApiKey=${ELEVENLABS_API_KEY}
       - EROSTTS_ElevenLabs__VoiceId=${ELEVENLABS_VOICE_ID:-21m00Tcm4TlvDq8ikWAM}
+      - EROSTTS_OpenAiTts__ApiKey=${OPENAI_TTS_API_KEY:-}
+      - EROSTTS_OpenAiTts__Model=${OPENAI_TTS_MODEL:-tts-1}
+      - EROSTTS_OpenAiTts__Voice=${OPENAI_TTS_VOICE:-alloy}
       - EROSTTS_OpenRouter__ApiKey=${OPENROUTER_API_KEY:-}
       - EROSTTS_OpenRouter__Model=${OPENROUTER_MODEL:-anthropic/claude-3.5-sonnet}
       - EROSTTS_OpenRouter__DefaultSystemPrompt=${OPENROUTER_DEFAULT_SYSTEM_PROMPT:-}

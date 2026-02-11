@@ -28,6 +28,13 @@ public interface IGuildConfigurationService
     Task RemoveConfigurationAsync(ulong guildId);
 
     /// <summary>
+    /// Sets the TTS provider for a guild.
+    /// </summary>
+    /// <param name="guildId">The guild ID.</param>
+    /// <param name="providerName">The provider name, or null to use the default.</param>
+    Task SetTtsProviderAsync(ulong guildId, string? providerName);
+
+    /// <summary>
     /// Gets all configured guilds.
     /// </summary>
     /// <returns>A collection of all guild configurations.</returns>

@@ -6,20 +6,17 @@ namespace ErosTTS.Bot.Tests.Services.TTS;
 public class CachedTtsServiceTests : IDisposable
 {
     private readonly string _cacheDir;
-    private readonly ITtsService _innerService;
-    private readonly IOptions<ElevenLabsConfiguration> _elevenLabsConfig;
+    private readonly ITtsProvider _innerProvider;
     private readonly ILogger<CachedTtsService> _logger;
 
     public CachedTtsServiceTests()
     {
         _cacheDir = Path.Combine(Path.GetTempPath(), $"tts-cache-test-{Guid.NewGuid():N}");
-        _innerService = Substitute.For<ITtsService>();
-        _elevenLabsConfig = Options.Create(new ElevenLabsConfiguration
-        {
-            ApiKey = "test-key",
-            VoiceId = "default-voice",
-            ModelId = "eleven_turbo_v2_5"
-        });
+        _innerProvider = Substitute.For<ITtsProvider>();
+        _innerProvider.ProviderName.Returns("ElevenLabs");
+        _innerProvider.DefaultVoiceId.Returns("default-voice");
+        _innerProvider.ModelId.Returns("eleven_turbo_v2_5");
+        _innerProvider.OutputFormat.Returns("mp3_22050_32");
         _logger = Substitute.For<ILogger<CachedTtsService>>();
     }
 
@@ -40,9 +37,8 @@ public class CachedTtsServiceTests : IDisposable
         });
 
         return new CachedTtsService(
-            _innerService,
+            _innerProvider,
             cacheConfig,
-            _elevenLabsConfig,
             _logger);
     }
 
@@ -50,7 +46,7 @@ public class CachedTtsServiceTests : IDisposable
     public async Task SynthesizeAsync_CacheMiss_CallsInnerServiceAndWritesFile()
     {
         var audioData = new byte[] { 0x01, 0x02, 0x03 };
-        _innerService.SynthesizeAsync("hello", null, Arg.Any<CancellationToken>())
+        _innerProvider.SynthesizeAsync("hello", null, Arg.Any<CancellationToken>())
             .Returns(new MemoryStream(audioData));
 
         var service = CreateService();
@@ -63,10 +59,10 @@ public class CachedTtsServiceTests : IDisposable
         await result.ReadExactlyAsync(buffer);
         buffer.Should().BeEquivalentTo(audioData);
 
-        await _innerService.Received(1).SynthesizeAsync("hello", null, Arg.Any<CancellationToken>());
+        await _innerProvider.Received(1).SynthesizeAsync("hello", null, Arg.Any<CancellationToken>());
 
         // Verify file was written to disk
-        var cacheKey = CachedTtsService.ComputeCacheKey("hello", "default-voice", "eleven_turbo_v2_5", "mp3_22050_32");
+        var cacheKey = CachedTtsService.ComputeCacheKey("ElevenLabs", "hello", "default-voice", "eleven_turbo_v2_5", "mp3_22050_32");
         var cachePath = Path.Combine(_cacheDir, $"{cacheKey}.mp3");
         File.Exists(cachePath).Should().BeTrue();
         var cachedBytes = await File.ReadAllBytesAsync(cachePath);
@@ -77,7 +73,7 @@ public class CachedTtsServiceTests : IDisposable
     public async Task SynthesizeAsync_CacheHit_ReturnsCachedFileWithoutCallingInner()
     {
         var audioData = new byte[] { 0xAA, 0xBB, 0xCC };
-        var cacheKey = CachedTtsService.ComputeCacheKey("hello", "default-voice", "eleven_turbo_v2_5", "mp3_22050_32");
+        var cacheKey = CachedTtsService.ComputeCacheKey("ElevenLabs", "hello", "default-voice", "eleven_turbo_v2_5", "mp3_22050_32");
         var cachePath = Path.Combine(_cacheDir, $"{cacheKey}.mp3");
 
         Directory.CreateDirectory(_cacheDir);
@@ -93,7 +89,7 @@ public class CachedTtsServiceTests : IDisposable
         await result.ReadExactlyAsync(buffer);
         buffer.Should().BeEquivalentTo(audioData);
 
-        await _innerService.DidNotReceive().SynthesizeAsync(
+        await _innerProvider.DidNotReceive().SynthesizeAsync(
             Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
 
@@ -101,7 +97,7 @@ public class CachedTtsServiceTests : IDisposable
     public async Task SynthesizeAsync_CacheDisabled_PassesThroughWithoutWritingFile()
     {
         var audioData = new byte[] { 0x01, 0x02, 0x03 };
-        _innerService.SynthesizeAsync("hello", null, Arg.Any<CancellationToken>())
+        _innerProvider.SynthesizeAsync("hello", null, Arg.Any<CancellationToken>())
             .Returns(new MemoryStream(audioData));
 
         var service = CreateService(enabled: false);
@@ -109,7 +105,7 @@ public class CachedTtsServiceTests : IDisposable
         var result = await service.SynthesizeAsync("hello");
 
         result.Should().NotBeNull();
-        await _innerService.Received(1).SynthesizeAsync("hello", null, Arg.Any<CancellationToken>());
+        await _innerProvider.Received(1).SynthesizeAsync("hello", null, Arg.Any<CancellationToken>());
 
         // No files should have been written
         Directory.Exists(_cacheDir).Should().BeFalse();
@@ -118,21 +114,21 @@ public class CachedTtsServiceTests : IDisposable
     [Fact]
     public async Task ValidateApiKeyAsync_DelegatesToInner()
     {
-        _innerService.ValidateApiKeyAsync(Arg.Any<CancellationToken>()).Returns(true);
+        _innerProvider.ValidateApiKeyAsync(Arg.Any<CancellationToken>()).Returns(true);
 
         var service = CreateService();
 
         var result = await service.ValidateApiKeyAsync();
 
         result.Should().BeTrue();
-        await _innerService.Received(1).ValidateApiKeyAsync(Arg.Any<CancellationToken>());
+        await _innerProvider.Received(1).ValidateApiKeyAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public void ComputeCacheKey_SameInputs_ReturnsSameKey()
     {
-        var key1 = CachedTtsService.ComputeCacheKey("hello", "voice1", "model1", "mp3_22050_32");
-        var key2 = CachedTtsService.ComputeCacheKey("hello", "voice1", "model1", "mp3_22050_32");
+        var key1 = CachedTtsService.ComputeCacheKey("ElevenLabs", "hello", "voice1", "model1", "mp3_22050_32");
+        var key2 = CachedTtsService.ComputeCacheKey("ElevenLabs", "hello", "voice1", "model1", "mp3_22050_32");
 
         key1.Should().Be(key2);
     }
@@ -140,8 +136,8 @@ public class CachedTtsServiceTests : IDisposable
     [Fact]
     public void ComputeCacheKey_DifferentText_ReturnsDifferentKey()
     {
-        var key1 = CachedTtsService.ComputeCacheKey("hello", "voice1", "model1", "mp3_22050_32");
-        var key2 = CachedTtsService.ComputeCacheKey("world", "voice1", "model1", "mp3_22050_32");
+        var key1 = CachedTtsService.ComputeCacheKey("ElevenLabs", "hello", "voice1", "model1", "mp3_22050_32");
+        var key2 = CachedTtsService.ComputeCacheKey("ElevenLabs", "world", "voice1", "model1", "mp3_22050_32");
 
         key1.Should().NotBe(key2);
     }
@@ -149,8 +145,8 @@ public class CachedTtsServiceTests : IDisposable
     [Fact]
     public void ComputeCacheKey_DifferentVoice_ReturnsDifferentKey()
     {
-        var key1 = CachedTtsService.ComputeCacheKey("hello", "voice1", "model1", "mp3_22050_32");
-        var key2 = CachedTtsService.ComputeCacheKey("hello", "voice2", "model1", "mp3_22050_32");
+        var key1 = CachedTtsService.ComputeCacheKey("ElevenLabs", "hello", "voice1", "model1", "mp3_22050_32");
+        var key2 = CachedTtsService.ComputeCacheKey("ElevenLabs", "hello", "voice2", "model1", "mp3_22050_32");
 
         key1.Should().NotBe(key2);
     }
@@ -158,8 +154,8 @@ public class CachedTtsServiceTests : IDisposable
     [Fact]
     public void ComputeCacheKey_DifferentModel_ReturnsDifferentKey()
     {
-        var key1 = CachedTtsService.ComputeCacheKey("hello", "voice1", "model1", "mp3_22050_32");
-        var key2 = CachedTtsService.ComputeCacheKey("hello", "voice1", "model2", "mp3_22050_32");
+        var key1 = CachedTtsService.ComputeCacheKey("ElevenLabs", "hello", "voice1", "model1", "mp3_22050_32");
+        var key2 = CachedTtsService.ComputeCacheKey("ElevenLabs", "hello", "voice1", "model2", "mp3_22050_32");
 
         key1.Should().NotBe(key2);
     }
@@ -167,8 +163,17 @@ public class CachedTtsServiceTests : IDisposable
     [Fact]
     public void ComputeCacheKey_DifferentOutputFormat_ReturnsDifferentKey()
     {
-        var key1 = CachedTtsService.ComputeCacheKey("hello", "voice1", "model1", "mp3_22050_32");
-        var key2 = CachedTtsService.ComputeCacheKey("hello", "voice1", "model1", "mp3_44100_128");
+        var key1 = CachedTtsService.ComputeCacheKey("ElevenLabs", "hello", "voice1", "model1", "mp3_22050_32");
+        var key2 = CachedTtsService.ComputeCacheKey("ElevenLabs", "hello", "voice1", "model1", "mp3_44100_128");
+
+        key1.Should().NotBe(key2);
+    }
+
+    [Fact]
+    public void ComputeCacheKey_DifferentProvider_ReturnsDifferentKey()
+    {
+        var key1 = CachedTtsService.ComputeCacheKey("ElevenLabs", "hello", "voice1", "model1", "mp3_22050_32");
+        var key2 = CachedTtsService.ComputeCacheKey("OpenAI", "hello", "voice1", "model1", "mp3_22050_32");
 
         key1.Should().NotBe(key2);
     }
@@ -177,7 +182,7 @@ public class CachedTtsServiceTests : IDisposable
     public async Task SynthesizeAsync_WithVoiceIdOverride_UsesThatVoiceForCacheKey()
     {
         var audioData = new byte[] { 0x01 };
-        _innerService.SynthesizeAsync("hello", "custom-voice", Arg.Any<CancellationToken>())
+        _innerProvider.SynthesizeAsync("hello", "custom-voice", Arg.Any<CancellationToken>())
             .Returns(new MemoryStream(audioData));
 
         var service = CreateService();
@@ -185,8 +190,36 @@ public class CachedTtsServiceTests : IDisposable
         await service.SynthesizeAsync("hello", "custom-voice");
 
         // File should be cached using the custom voice in the key
-        var cacheKey = CachedTtsService.ComputeCacheKey("hello", "custom-voice", "eleven_turbo_v2_5", "mp3_22050_32");
+        var cacheKey = CachedTtsService.ComputeCacheKey("ElevenLabs", "hello", "custom-voice", "eleven_turbo_v2_5", "mp3_22050_32");
         var cachePath = Path.Combine(_cacheDir, $"{cacheKey}.mp3");
         File.Exists(cachePath).Should().BeTrue();
+    }
+
+    [Fact]
+    public void ProviderName_DelegatesToInner()
+    {
+        var service = CreateService();
+        service.ProviderName.Should().Be("ElevenLabs");
+    }
+
+    [Fact]
+    public void DefaultVoiceId_DelegatesToInner()
+    {
+        var service = CreateService();
+        service.DefaultVoiceId.Should().Be("default-voice");
+    }
+
+    [Fact]
+    public void ModelId_DelegatesToInner()
+    {
+        var service = CreateService();
+        service.ModelId.Should().Be("eleven_turbo_v2_5");
+    }
+
+    [Fact]
+    public void OutputFormat_DelegatesToInner()
+    {
+        var service = CreateService();
+        service.OutputFormat.Should().Be("mp3_22050_32");
     }
 }

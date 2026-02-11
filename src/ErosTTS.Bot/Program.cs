@@ -98,18 +98,40 @@ try
                 context.Configuration.GetSection(NpcConfiguration.SectionName));
             services.Configure<TtsCacheConfiguration>(
                 context.Configuration.GetSection(TtsCacheConfiguration.SectionName));
+            services.Configure<OpenAiTtsConfiguration>(
+                context.Configuration.GetSection(OpenAiTtsConfiguration.SectionName));
 
             // HTTP Client for Eleven Labs with retry policy (concrete type for decorator wrapping)
             services.AddHttpClient<ElevenLabsTtsService>()
                 .AddPolicyHandler(GetRetryPolicy());
 
-            // Register CachedTtsService as ITtsService (wraps ElevenLabsTtsService)
-            services.AddSingleton<ITtsService>(sp =>
+            // Register ElevenLabs as a cached ITtsProvider
+            services.AddSingleton<ITtsProvider>(sp =>
                 new CachedTtsService(
                     sp.GetRequiredService<ElevenLabsTtsService>(),
                     sp.GetRequiredService<IOptions<TtsCacheConfiguration>>(),
-                    sp.GetRequiredService<IOptions<ElevenLabsConfiguration>>(),
                     sp.GetRequiredService<ILogger<CachedTtsService>>()));
+
+            // Backward-compatible ITtsService registration (points to ElevenLabs provider)
+            services.AddSingleton<ITtsService>(sp =>
+                sp.GetRequiredService<IEnumerable<ITtsProvider>>().First(p => p.ProviderName == "ElevenLabs"));
+
+            // Conditionally register OpenAI TTS if API key is configured
+            var openAiApiKey = context.Configuration.GetSection("OpenAiTts")["ApiKey"];
+            if (!string.IsNullOrWhiteSpace(openAiApiKey))
+            {
+                services.AddHttpClient<OpenAiTtsService>()
+                    .AddPolicyHandler(GetRetryPolicy());
+
+                services.AddSingleton<ITtsProvider>(sp =>
+                    new CachedTtsService(
+                        sp.GetRequiredService<OpenAiTtsService>(),
+                        sp.GetRequiredService<IOptions<TtsCacheConfiguration>>(),
+                        sp.GetRequiredService<ILogger<CachedTtsService>>()));
+            }
+
+            // Provider factory resolves per-guild provider
+            services.AddSingleton<ITtsProviderFactory, TtsProviderFactory>();
 
             // HTTP Client for OpenRouter with retry policy
             services.AddHttpClient<ILlmService, OpenRouterService>()

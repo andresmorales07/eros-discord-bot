@@ -11,10 +11,17 @@ namespace ErosTTS.Bot.Tests.HostedServices;
 public sealed class TtsProcessorServiceTests
 {
     private readonly ITtsQueue _queue = Substitute.For<ITtsQueue>();
-    private readonly ITtsService _ttsService = Substitute.For<ITtsService>();
+    private readonly ITtsProviderFactory _providerFactory = Substitute.For<ITtsProviderFactory>();
+    private readonly ITtsProvider _ttsProvider = Substitute.For<ITtsProvider>();
     private readonly IAudioService _audioService = Substitute.For<IAudioService>();
     private readonly IGuildConfigurationService _guildConfig = Substitute.For<IGuildConfigurationService>();
     private readonly ILogger<TtsProcessorService> _logger = Substitute.For<ILogger<TtsProcessorService>>();
+
+    public TtsProcessorServiceTests()
+    {
+        _ttsProvider.ProviderName.Returns("ElevenLabs");
+        _providerFactory.GetProviderAsync(Arg.Any<ulong>()).Returns(_ttsProvider);
+    }
 
     private TtsProcessorService CreateService(int maxRetries = 3)
     {
@@ -24,11 +31,9 @@ public sealed class TtsProcessorServiceTests
             MaxRetries = maxRetries
         });
 
-        // GatewayClient is required by the constructor but not used by ProcessItemAsync/HandleFailureAsync.
-        // We pass null via a helper since it's only used in ExecuteAsync's Ready wait logic.
         return new TtsProcessorService(
             _queue,
-            _ttsService,
+            _providerFactory,
             _audioService,
             _guildConfig,
             null!,
@@ -59,7 +64,7 @@ public sealed class TtsProcessorServiceTests
 
         await sut.ProcessItemAsync(CreateTestItem(), CancellationToken.None);
 
-        await _ttsService.DidNotReceive().SynthesizeAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        await _ttsProvider.DidNotReceive().SynthesizeAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
         await _audioService.DidNotReceive().PlayAudioAsync(Arg.Any<ulong>(), Arg.Any<ulong>(), Arg.Any<Stream>(), Arg.Any<CancellationToken>());
     }
 
@@ -76,7 +81,7 @@ public sealed class TtsProcessorServiceTests
 
         await sut.ProcessItemAsync(CreateTestItem(), CancellationToken.None);
 
-        await _ttsService.DidNotReceive().SynthesizeAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+        await _ttsProvider.DidNotReceive().SynthesizeAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -89,14 +94,14 @@ public sealed class TtsProcessorServiceTests
             VoiceChannelId = 300,
             VoiceId = "guild-voice"
         });
-        _ttsService.SynthesizeAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+        _ttsProvider.SynthesizeAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(new MemoryStream([1, 2, 3]));
 
         var item = CreateTestItem(voiceId: "npc-voice");
 
         await sut.ProcessItemAsync(item, CancellationToken.None);
 
-        await _ttsService.Received(1).SynthesizeAsync(item.Text, "npc-voice", Arg.Any<CancellationToken>());
+        await _ttsProvider.Received(1).SynthesizeAsync(item.Text, "npc-voice", Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -109,14 +114,14 @@ public sealed class TtsProcessorServiceTests
             VoiceChannelId = 300,
             VoiceId = "guild-voice"
         });
-        _ttsService.SynthesizeAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+        _ttsProvider.SynthesizeAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(new MemoryStream([1, 2, 3]));
 
         var item = CreateTestItem(voiceId: null);
 
         await sut.ProcessItemAsync(item, CancellationToken.None);
 
-        await _ttsService.Received(1).SynthesizeAsync(item.Text, "guild-voice", Arg.Any<CancellationToken>());
+        await _ttsProvider.Received(1).SynthesizeAsync(item.Text, "guild-voice", Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -129,7 +134,7 @@ public sealed class TtsProcessorServiceTests
             VoiceChannelId = 300
         });
         var audioStream = new MemoryStream([1, 2, 3]);
-        _ttsService.SynthesizeAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+        _ttsProvider.SynthesizeAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(audioStream);
 
         var item = CreateTestItem();
@@ -150,7 +155,7 @@ public sealed class TtsProcessorServiceTests
         });
         var audioStream = Substitute.For<Stream>();
         audioStream.DisposeAsync().Returns(ValueTask.CompletedTask);
-        _ttsService.SynthesizeAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+        _ttsProvider.SynthesizeAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(audioStream);
 
         await sut.ProcessItemAsync(CreateTestItem(), CancellationToken.None);
@@ -169,7 +174,7 @@ public sealed class TtsProcessorServiceTests
         });
         var audioStream = Substitute.For<Stream>();
         audioStream.DisposeAsync().Returns(ValueTask.CompletedTask);
-        _ttsService.SynthesizeAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+        _ttsProvider.SynthesizeAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(audioStream);
         _audioService.PlayAudioAsync(Arg.Any<ulong>(), Arg.Any<ulong>(), Arg.Any<Stream>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException(new VoiceConnectionException("test")));
@@ -178,6 +183,25 @@ public sealed class TtsProcessorServiceTests
 
         await act.Should().ThrowAsync<VoiceConnectionException>();
         await audioStream.Received(1).DisposeAsync();
+    }
+
+    [Fact]
+    public async Task ProcessItemAsync_ResolvesProviderForGuild()
+    {
+        var sut = CreateService();
+        _guildConfig.GetConfigurationAsync(Arg.Any<ulong>()).Returns(new GuildTtsConfiguration
+        {
+            GuildId = 100,
+            VoiceChannelId = 300
+        });
+        _ttsProvider.SynthesizeAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new MemoryStream([1, 2, 3]));
+
+        var item = CreateTestItem(guildId: 100);
+
+        await sut.ProcessItemAsync(item, CancellationToken.None);
+
+        await _providerFactory.Received(1).GetProviderAsync(100);
     }
 
     // ─── HandleFailureAsync ─────────────────────────────────────────────

@@ -26,6 +26,11 @@ public sealed record GuildTtsConfiguration
     public string? VoiceId { get; init; }
 
     /// <summary>
+    /// The TTS provider name for this guild (e.g. "ElevenLabs", "OpenAI"). Null uses the default.
+    /// </summary>
+    public string? TtsProvider { get; init; }
+
+    /// <summary>
     /// When this configuration was last updated.
     /// </summary>
     public DateTimeOffset UpdatedAt { get; init; } = DateTimeOffset.UtcNow;

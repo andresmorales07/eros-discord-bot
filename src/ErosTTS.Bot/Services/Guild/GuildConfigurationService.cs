@@ -42,6 +42,28 @@ public sealed class GuildConfigurationService : IGuildConfigurationService
         return Task.FromResult(config);
     }
 
+    public Task SetTtsProviderAsync(ulong guildId, string? providerName)
+    {
+        _configurations.AddOrUpdate(
+            guildId,
+            _ => new GuildTtsConfiguration
+            {
+                GuildId = guildId,
+                TtsProvider = providerName,
+                UpdatedAt = DateTimeOffset.UtcNow
+            },
+            (_, existing) => existing with
+            {
+                TtsProvider = providerName,
+                UpdatedAt = DateTimeOffset.UtcNow
+            });
+
+        _logger.LogInformation("Updated TTS provider for guild {GuildId}: {Provider}",
+            guildId, providerName ?? "(default)");
+
+        return Task.CompletedTask;
+    }
+
     public Task RemoveConfigurationAsync(ulong guildId)
     {
         if (_configurations.TryRemove(guildId, out _))

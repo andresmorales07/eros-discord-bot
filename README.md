@@ -1,17 +1,18 @@
 # ErosTTS Discord Bot
 
-A Discord bot that converts text to speech using the Eleven Labs API and plays it in Discord voice channels. Also supports **AI-powered multi-NPC roleplaying** for D&D sessions and similar scenarios.
+A Discord bot that converts text to speech using multiple TTS providers (Eleven Labs and OpenAI) and plays it in Discord voice channels. Also supports **AI-powered multi-NPC roleplaying** for D&D sessions and similar scenarios.
 
 ## Features
 
 - **Slash command TTS** - Use `/say` to speak text in voice channels
+- **Multi-provider TTS** - Supports both Eleven Labs and OpenAI TTS APIs with per-guild provider selection
 - **Multi-NPC Roleplaying** - Create multiple named NPCs with individual personalities, voices, and conversation histories
 - **Auto-switch** - LLM-driven NPC selection automatically picks the best character to respond
-- **Per-NPC voices** - Each NPC can have its own ElevenLabs voice ID
-- **TTS Caching** - Audio files cached on disk to reduce API costs and improve response time
+- **Per-NPC voices** - Each NPC can have its own voice ID (from the configured TTS provider)
+- **TTS Caching** - Audio files cached on disk to reduce API costs and improve response time (provider-agnostic)
 - **Import/Export** - Share NPC configurations between guilds via JSON
 - **Privacy-focused** - Bot joins voice channels self-deafened and command responses are ephemeral (except `/prompt`)
-- Converts text to speech using Eleven Labs TTS API
+- Converts text to speech using Eleven Labs or OpenAI TTS API
 - AI responses powered by OpenRouter (supports Claude, GPT, and other models)
 - Automatic voice channel detection (joins your current voice channel)
 - Message queue system for ordered, conflict-free playback
@@ -26,7 +27,8 @@ A Discord bot that converts text to speech using the Eleven Labs API and plays i
 - [FFmpeg](https://ffmpeg.org/download.html) (for audio processing)
 - [Opus codec](https://opus-codec.org/) (included via NuGet package)
 - A [Discord Bot Token](https://discord.com/developers/applications)
-- An [Eleven Labs API Key](https://elevenlabs.io/)
+- An [Eleven Labs API Key](https://elevenlabs.io/) (default TTS provider)
+- An [OpenAI API Key](https://platform.openai.com/) (optional, for OpenAI TTS provider)
 - An [OpenRouter API Key](https://openrouter.ai/) (optional, for AI character features)
 
 ## Discord Bot Setup
@@ -50,9 +52,12 @@ A Discord bot that converts text to speech using the Eleven Labs API and plays i
 | Variable | Description | Required |
 |----------|-------------|----------|
 | `EROSTTS_Discord__Token` | Discord bot token | Yes |
-| `EROSTTS_ElevenLabs__ApiKey` | Eleven Labs API key | Yes |
+| `EROSTTS_ElevenLabs__ApiKey` | Eleven Labs API key (default TTS provider) | Yes |
 | `EROSTTS_ElevenLabs__VoiceId` | Voice ID to use | No (defaults to Rachel) |
 | `EROSTTS_ElevenLabs__ModelId` | ElevenLabs model to use | No (defaults to `eleven_turbo_v2_5`) |
+| `EROSTTS_OpenAiTts__ApiKey` | OpenAI API key (enables OpenAI TTS provider) | No |
+| `EROSTTS_OpenAiTts__Model` | OpenAI TTS model (tts-1 or tts-1-hd) | No (defaults to `tts-1`) |
+| `EROSTTS_OpenAiTts__Voice` | OpenAI voice (alloy, echo, fable, onyx, nova, shimmer) | No (defaults to `alloy`) |
 | `EROSTTS_Voice__FFmpegPath` | Path to FFmpeg executable | No (defaults to `ffmpeg`) |
 | `EROSTTS_TtsCache__Enabled` | Enable TTS audio caching | No (defaults to `true`) |
 | `EROSTTS_TtsCache__CacheDirectory` | Directory for cached audio files | No (defaults to `data/tts-cache`) |
@@ -75,6 +80,14 @@ A Discord bot that converts text to speech using the Eleven Labs API and plays i
     "ModelId": "eleven_turbo_v2_5",
     "Stability": 0.5,
     "SimilarityBoost": 0.75
+  },
+  "OpenAiTts": {
+    "ApiKey": "your_openai_api_key_here",
+    "Model": "tts-1",
+    "Voice": "alloy",
+    "OutputFormat": "mp3",
+    "Speed": 1.0,
+    "TimeoutSeconds": 30
   },
   "Voice": {
     "FFmpegPath": "ffmpeg",
@@ -187,8 +200,12 @@ The bot image is published to GitHub Container Registry at `ghcr.io/andresmorale
          - EROSTTS_ElevenLabs__ApiKey=${ELEVENLABS_API_KEY}
          # Required for AI features
          - EROSTTS_OpenRouter__ApiKey=${OPENROUTER_API_KEY}
-         # Optional
+         # Optional - TTS Providers
          - EROSTTS_ElevenLabs__VoiceId=${ELEVENLABS_VOICE_ID:-21m00Tcm4TlvDq8ikWAM}
+         - EROSTTS_OpenAiTts__ApiKey=${OPENAI_TTS_API_KEY:-}
+         - EROSTTS_OpenAiTts__Model=${OPENAI_TTS_MODEL:-tts-1}
+         - EROSTTS_OpenAiTts__Voice=${OPENAI_TTS_VOICE:-alloy}
+         # Optional - AI and Database
          - EROSTTS_OpenRouter__Model=${OPENROUTER_MODEL:-anthropic/claude-3.5-sonnet}
          - EROSTTS_OpenRouter__DefaultSystemPrompt=${OPENROUTER_DEFAULT_SYSTEM_PROMPT:-}
          - EROSTTS_Database__Provider=${DATABASE_PROVIDER:-Sqlite}
@@ -211,8 +228,13 @@ The bot image is published to GitHub Container Registry at `ghcr.io/andresmorale
    # Required for AI features (optional if not using /prompt)
    OPENROUTER_API_KEY=your_openrouter_api_key
 
-   # Optional overrides
+   # Optional - TTS Providers
    # ELEVENLABS_VOICE_ID=21m00Tcm4TlvDq8ikWAM
+   # OPENAI_TTS_API_KEY=your_openai_api_key
+   # OPENAI_TTS_MODEL=tts-1
+   # OPENAI_TTS_VOICE=alloy
+
+   # Optional - AI and Database
    # OPENROUTER_MODEL=anthropic/claude-3.5-sonnet
    # OPENROUTER_DEFAULT_SYSTEM_PROMPT=Keep responses concise. Respond in character.
    # DATABASE_PROVIDER=Sqlite
@@ -267,8 +289,9 @@ All command responses are **ephemeral** (only visible to the user who ran the co
 |---------|-------------|------------|------------|
 | `/say <text> [voice-channel]` | Speak text in a voice channel | Everyone | Ephemeral |
 | `/tts-setup <voice-channel> [text-channel] [voice-id]` | Configure default voice channel and custom voice | Manage Guild | Ephemeral |
+| `/tts-provider <provider>` | Set TTS provider (ElevenLabs or OpenAI) | Manage Guild | Ephemeral |
 | `/tts-stop` | Disconnect from voice | Everyone | Ephemeral |
-| `/tts-status` | Show current configuration, mode, and voice ID | Everyone | Ephemeral |
+| `/tts-status` | Show current configuration, mode, voice ID, and TTS provider | Everyone | Ephemeral |
 | `/tts-clear` | Remove TTS configuration | Manage Guild | Ephemeral |
 
 ### NPC Commands
@@ -305,15 +328,25 @@ You can also specify a different voice channel:
 /say text:Hello everyone! voice-channel:General
 ```
 
-### Custom Voice per Server
+### Custom Voice and Provider per Server
 
-Each Discord server can use a different ElevenLabs voice. Use `/tts-setup` with the `voice-id` parameter:
+Each Discord server can choose a TTS provider (ElevenLabs or OpenAI) and use a different voice.
 
-```
-/tts-setup voice-channel:General voice-id:EXAVITQu4vr4xnSDxMaL
-```
+1. Set the TTS provider (defaults to ElevenLabs):
+   ```
+   /tts-provider provider:OpenAI
+   ```
 
-You can find voice IDs in your [ElevenLabs Voice Library](https://elevenlabs.io/voice-library). If no `voice-id` is specified, the default voice from your configuration is used.
+2. Configure a custom voice with `/tts-setup`:
+   ```
+   /tts-setup voice-channel:General voice-id:EXAVITQu4vr4xnSDxMaL
+   ```
+
+You can find voice IDs in:
+- [ElevenLabs Voice Library](https://elevenlabs.io/voice-library) for ElevenLabs voices
+- [OpenAI TTS Documentation](https://platform.openai.com/docs/guides/text-to-speech) for OpenAI voices (alloy, echo, fable, onyx, nova, shimmer)
+
+If no `voice-id` is specified, the default voice from your configuration is used.
 
 ### Multi-NPC Roleplaying
 
@@ -389,7 +422,7 @@ ErosTTS.Bot/
 │   ├── LLM/               # OpenRouter API client + ConversationMessage DTO
 │   ├── Npc/               # Multi-NPC system (CRUD, auto-switch, history, import/export)
 │   ├── Queue/             # Message queue (System.Threading.Channels)
-│   └── TTS/               # Eleven Labs API client (with caching decorator)
+│   └── TTS/               # Multi-provider TTS (ElevenLabs, OpenAI, with caching decorator)
 ├── Utilities/             # Text sanitization utilities
 └── Program.cs             # Host builder and DI configuration
 ```
@@ -415,8 +448,9 @@ ErosTTS.Bot/
 
 ### Rate limit errors
 - The bot implements exponential backoff for rate limits
-- Consider upgrading your Eleven Labs plan for higher limits
+- Consider upgrading your TTS provider plan (Eleven Labs or OpenAI) for higher limits
 - Reduce message frequency in the monitored channel
+- Try switching to a different TTS provider using `/tts-provider`
 
 ### Voice connection issues
 - The bot will automatically reconnect on disconnect

@@ -9,48 +9,45 @@ using Microsoft.Extensions.Options;
 namespace ErosTTS.Bot.Services.TTS;
 
 /// <summary>
-/// Eleven Labs API implementation of the TTS service.
+/// OpenAI TTS API implementation.
 /// </summary>
-public sealed class ElevenLabsTtsService : ITtsProvider
+public sealed class OpenAiTtsService : ITtsProvider
 {
     private readonly HttpClient _httpClient;
-    private readonly ElevenLabsConfiguration _config;
-    private readonly ILogger<ElevenLabsTtsService> _logger;
+    private readonly OpenAiTtsConfiguration _config;
+    private readonly ILogger<OpenAiTtsService> _logger;
 
-    private const string BaseUrl = "https://api.elevenlabs.io/v1";
+    private const string BaseUrl = "https://api.openai.com/v1";
 
-    public string ProviderName => "ElevenLabs";
-    public string DefaultVoiceId => _config.VoiceId;
-    public string ModelId => _config.ModelId;
+    public string ProviderName => "OpenAI";
+    public string DefaultVoiceId => _config.Voice;
+    public string ModelId => _config.Model;
     public string OutputFormat => _config.OutputFormat;
 
-    public ElevenLabsTtsService(
+    public OpenAiTtsService(
         HttpClient httpClient,
-        IOptions<ElevenLabsConfiguration> config,
-        ILogger<ElevenLabsTtsService> logger)
+        IOptions<OpenAiTtsConfiguration> config,
+        ILogger<OpenAiTtsService> logger)
     {
         _httpClient = httpClient;
         _config = config.Value;
         _logger = logger;
 
-        _httpClient.DefaultRequestHeaders.Add("xi-api-key", _config.ApiKey);
+        _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_config.ApiKey}");
         _httpClient.Timeout = TimeSpan.FromSeconds(_config.TimeoutSeconds);
     }
 
     public async Task<Stream> SynthesizeAsync(string text, string? voiceId = null, CancellationToken ct = default)
     {
-        var effectiveVoiceId = voiceId ?? _config.VoiceId;
-        var url = $"{BaseUrl}/text-to-speech/{effectiveVoiceId}?output_format={_config.OutputFormat}";
+        var effectiveVoice = voiceId ?? _config.Voice;
 
         var payload = new
         {
-            text,
-            model_id = _config.ModelId,
-            voice_settings = new
-            {
-                stability = _config.Stability,
-                similarity_boost = _config.SimilarityBoost
-            }
+            model = _config.Model,
+            input = text,
+            voice = effectiveVoice,
+            response_format = _config.OutputFormat,
+            speed = _config.Speed
         };
 
         var content = new StringContent(
@@ -58,51 +55,48 @@ public sealed class ElevenLabsTtsService : ITtsProvider
             Encoding.UTF8,
             "application/json");
 
-        _logger.LogDebug("Sending TTS request for {CharCount} characters to voice {VoiceId}",
-            text.Length, effectiveVoiceId);
+        _logger.LogDebug("Sending TTS request for {CharCount} characters to OpenAI voice {Voice}",
+            text.Length, effectiveVoice);
 
         HttpResponseMessage response;
         try
         {
-            response = await _httpClient.PostAsync(url, content, ct);
+            response = await _httpClient.PostAsync($"{BaseUrl}/audio/speech", content, ct);
         }
         catch (TaskCanceledException ex) when (!ct.IsCancellationRequested)
         {
-            _logger.LogError(ex, "Request to Eleven Labs timed out after {Timeout}s",
+            _logger.LogError(ex, "Request to OpenAI TTS timed out after {Timeout}s",
                 _config.TimeoutSeconds);
             throw new TtsServiceException("Request timed out", ex);
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogError(ex, "Network error communicating with Eleven Labs API");
+            _logger.LogError(ex, "Network error communicating with OpenAI TTS API");
             throw new TtsServiceException("Network error", ex);
         }
 
         if (!response.IsSuccessStatusCode)
         {
             var errorBody = await response.Content.ReadAsStringAsync(ct);
-            _logger.LogError("ElevenLabs API error: {StatusCode} - {Body}",
+            _logger.LogError("OpenAI TTS API error: {StatusCode} - {Body}",
                 response.StatusCode, errorBody);
 
             throw response.StatusCode switch
             {
                 HttpStatusCode.TooManyRequests => new RateLimitException(
-                    "ElevenLabs rate limit exceeded",
+                    "OpenAI rate limit exceeded",
                     response.Headers.RetryAfter?.Delta ?? TimeSpan.FromSeconds(60)),
                 HttpStatusCode.Unauthorized => new AuthenticationException(
-                    "Invalid ElevenLabs API key"),
-                HttpStatusCode.UnprocessableEntity => new InvalidTextException(
-                    $"Text processing error: {errorBody}"),
+                    "Invalid OpenAI API key"),
                 HttpStatusCode.BadRequest => new InvalidTextException(
                     $"Bad request: {errorBody}"),
                 _ => new TtsServiceException(
-                    $"ElevenLabs API error: {response.StatusCode} - {errorBody}")
+                    $"OpenAI TTS API error: {response.StatusCode} - {errorBody}")
             };
         }
 
-        _logger.LogDebug("Successfully received audio response from Eleven Labs");
+        _logger.LogDebug("Successfully received audio response from OpenAI TTS");
 
-        // Return the audio stream - caller is responsible for disposing
         var audioStream = new MemoryStream();
         await response.Content.CopyToAsync(audioStream, ct);
         audioStream.Position = 0;
@@ -113,21 +107,21 @@ public sealed class ElevenLabsTtsService : ITtsProvider
     {
         try
         {
-            var response = await _httpClient.GetAsync($"{BaseUrl}/user", ct);
+            var response = await _httpClient.GetAsync($"{BaseUrl}/models", ct);
 
             if (response.IsSuccessStatusCode)
             {
-                _logger.LogInformation("Eleven Labs API key validated successfully");
+                _logger.LogInformation("OpenAI API key validated successfully");
                 return true;
             }
 
-            _logger.LogWarning("Eleven Labs API key validation failed: {StatusCode}",
+            _logger.LogWarning("OpenAI API key validation failed: {StatusCode}",
                 response.StatusCode);
             return false;
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to validate Eleven Labs API key");
+            _logger.LogWarning(ex, "Failed to validate OpenAI API key");
             return false;
         }
     }

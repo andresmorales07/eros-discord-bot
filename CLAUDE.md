@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-ErosTTS is a Discord bot that converts text to speech using the Eleven Labs API and plays audio in Discord voice channels. Built with .NET 10, it uses NetCord for Discord integration and supports both slash commands and optional text channel monitoring.
+ErosTTS is a Discord bot that converts text to speech using multiple TTS providers (Eleven Labs and OpenAI) and plays audio in Discord voice channels. Built with .NET 10, it uses NetCord for Discord integration and supports both slash commands and optional text channel monitoring.
 
 The bot also supports **AI-powered multi-NPC roleplaying** using OpenRouter API, allowing it to play multiple named characters (NPCs) in D&D sessions or similar roleplaying scenarios. Each NPC has its own personality, optional voice, and conversation history.
 
@@ -33,14 +33,24 @@ cd docker && docker-compose up -d
 | Variable | Description |
 |----------|-------------|
 | `EROSTTS_Discord__Token` | Discord bot token |
-| `EROSTTS_ElevenLabs__ApiKey` | Eleven Labs API key |
+| `EROSTTS_ElevenLabs__ApiKey` | Eleven Labs API key (default TTS provider) |
 
 ### Required for AI Features
 | Variable | Description |
 |----------|-------------|
 | `EROSTTS_OpenRouter__ApiKey` | OpenRouter API key (only needed if using `/prompt` command) |
 
-### Optional
+### Optional - TTS Providers
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `EROSTTS_OpenAiTts__ApiKey` | *(empty)* | OpenAI API key (enables OpenAI TTS provider, optional alternative to ElevenLabs) |
+| `EROSTTS_OpenAiTts__Model` | `tts-1` | OpenAI TTS model (tts-1 or tts-1-hd) |
+| `EROSTTS_OpenAiTts__Voice` | `alloy` | OpenAI voice (alloy, echo, fable, onyx, nova, shimmer) |
+| `EROSTTS_OpenAiTts__OutputFormat` | `mp3` | OpenAI output format (mp3, opus, aac, flac, wav, pcm) |
+| `EROSTTS_OpenAiTts__Speed` | `1.0` | Speech speed multiplier (0.25-4.0) |
+| `EROSTTS_OpenAiTts__TimeoutSeconds` | `30` | Request timeout in seconds |
+
+### Optional - General
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `EROSTTS_ElevenLabs__VoiceId` | `21m00Tcm4TlvDq8ikWAM` | Eleven Labs voice ID (Rachel) |
@@ -94,8 +104,12 @@ services:
       - EROSTTS_ElevenLabs__ApiKey=${ELEVENLABS_API_KEY}
       # Required for AI features
       - EROSTTS_OpenRouter__ApiKey=${OPENROUTER_API_KEY}
-      # Optional
+      # Optional - TTS Providers
       - EROSTTS_ElevenLabs__VoiceId=${ELEVENLABS_VOICE_ID:-21m00Tcm4TlvDq8ikWAM}
+      - EROSTTS_OpenAiTts__ApiKey=${OPENAI_TTS_API_KEY:-}
+      - EROSTTS_OpenAiTts__Model=${OPENAI_TTS_MODEL:-tts-1}
+      - EROSTTS_OpenAiTts__Voice=${OPENAI_TTS_VOICE:-alloy}
+      # Optional - AI and Database
       - EROSTTS_OpenRouter__Model=${OPENROUTER_MODEL:-anthropic/claude-3.5-sonnet}
       - EROSTTS_OpenRouter__DefaultSystemPrompt=${OPENROUTER_DEFAULT_SYSTEM_PROMPT:-}
       - EROSTTS_Database__Provider=${DATABASE_PROVIDER:-Sqlite}
@@ -144,7 +158,7 @@ src/ErosTTS.Bot/
 │   ├── LLM/               # OpenRouter API client + ConversationMessage DTO
 │   ├── Npc/               # Multi-NPC system (INpcService, INpcSelectionService, domain records)
 │   ├── Queue/             # TTS message queue (System.Threading.Channels)
-│   ├── TTS/               # Eleven Labs API client (ElevenLabsTtsService, CachedTtsService decorator)
+│   ├── TTS/               # Multi-provider TTS (ITtsProvider, ITtsProviderFactory, ElevenLabsTtsService, OpenAiTtsService, CachedTtsService decorator)
 │   ├── MessageProcessingService.cs      # Message processing logic (sanitization, truncation, queue item creation)
 │   ├── PromptOrchestrationService.cs    # NPC prompt pipeline (selection, LLM call, history, TTS queueing)
 │   └── VoiceChannelResolverService.cs   # Three-step voice channel resolution (explicit → user → default)
@@ -155,7 +169,8 @@ src/ErosTTS.Bot/
 ## Key Technologies
 
 - **NetCord** (v1.0.0-alpha.460) - Discord library for .NET
-- **Eleven Labs API** - Text-to-speech synthesis
+- **Eleven Labs API** - Text-to-speech synthesis (default provider)
+- **OpenAI API** - Alternative text-to-speech synthesis provider
 - **OpenRouter API** - LLM access for AI character responses
 - **Polly** - HTTP retry policies with exponential backoff
 - **Serilog** - Structured logging to console and rolling files
@@ -178,7 +193,8 @@ src/ErosTTS.Bot/
 - **Slash commands**: NetCord's `ApplicationCommandModule<ApplicationCommandContext>` base class
 - **DI**: All services registered in `Program.cs` ConfigureServices
 - **Persistence**: Config-driven provider selection (`Database:Provider`): `InMemory` (default, ConcurrentDictionary), `Sqlite` (EF Core), or `Postgres` (future). EF services use `IDbContextFactory<T>` to stay singleton-compatible.
-- **Decorator pattern**: `CachedTtsService` decorates `ElevenLabsTtsService` to provide transparent disk caching of TTS audio. Cache keys use SHA256 hash of text+voiceId+modelId+outputFormat. Enabled by default via `TtsCache:Enabled` configuration.
+- **Multi-provider TTS**: `ITtsProvider` interface extends `ITtsService` with provider metadata (ProviderName, DefaultVoiceId, ModelId, OutputFormat). `ITtsProviderFactory` resolves guild-specific provider selection. Currently supports ElevenLabs (default) and OpenAI. OpenAI provider is conditionally registered only if `OpenAiTts:ApiKey` is configured.
+- **Decorator pattern**: `CachedTtsService` decorates `ITtsProvider` implementations to provide transparent disk caching of TTS audio. Cache keys use SHA256 hash of text+voiceId+modelId+outputFormat. Enabled by default via `TtsCache:Enabled` configuration. Decorator is provider-agnostic.
 - **Service extraction for testability**: Complex logic extracted from commands and hosted services into dedicated service interfaces (`IMessageProcessingService`, `IPromptOrchestrationService`, `IVoiceChannelResolverService`) to enable unit testing without Discord dependencies.
 - **Async throughout**: Methods return `Task` or `Task<T>`
 
@@ -194,8 +210,9 @@ All commands respond with ephemeral messages (only visible to the user) except `
 ### TTS Commands (all ephemeral)
 - `/say <text> [voice-channel]` - Speak text in voice channel
 - `/tts-setup <voice-channel> [text-channel] [voice-id]` - Configure defaults (Manage Guild permission)
+- `/tts-provider <provider>` - Set TTS provider for this guild: ElevenLabs or OpenAI (Manage Guild permission)
 - `/tts-stop` - Disconnect from voice
-- `/tts-status` - Show current configuration (including voice ID)
+- `/tts-status` - Show current configuration (including voice ID and TTS provider)
 - `/tts-clear` - Remove configuration (Manage Guild permission)
 
 ### NPC Commands (all ephemeral except `/prompt`)

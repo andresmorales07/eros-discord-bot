@@ -26,6 +26,11 @@ public sealed class GuildTtsConfigurationEntity
     public string? VoiceId { get; set; }
 
     /// <summary>
+    /// The TTS provider name for this guild (e.g. "ElevenLabs", "OpenAI").
+    /// </summary>
+    public string? TtsProvider { get; set; }
+
+    /// <summary>
     /// When this configuration was last updated.
     /// </summary>
     public DateTimeOffset UpdatedAt { get; set; }
