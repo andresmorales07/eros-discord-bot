@@ -211,7 +211,7 @@ All commands respond with ephemeral messages (only visible to the user) except `
 - `/say <text> [voice-channel]` - Speak text in voice channel
 - `/tts-config [voice-channel] [text-channel] [voice-id] [provider]` - Configure TTS settings; at least one option required (Manage Guild permission)
 - `/tts-stop` - Disconnect from voice
-- `/tts-status` - Show current configuration (including voice ID and TTS provider)
+- `/tts-status` - Show current configuration (voice channel, text channel, voice ID, TTS provider, connection status, queue size)
 - `/tts-clear` - Remove configuration (Manage Guild permission)
 
 ### NPC Commands (all ephemeral except `/prompt`)

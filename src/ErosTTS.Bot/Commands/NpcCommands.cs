@@ -346,7 +346,7 @@ public sealed class NpcCommands : ApplicationCommandModule<ApplicationCommandCon
         if (config?.VoiceChannelId is null || config.VoiceChannelId.Value == 0)
         {
             await RespondEphemeralAsync(
-                "No voice channel configured. Please run `/tts-setup` first to configure a default voice channel.");
+                "No voice channel configured. Please run `/tts-config` first to configure a default voice channel.");
             return;
         }
 

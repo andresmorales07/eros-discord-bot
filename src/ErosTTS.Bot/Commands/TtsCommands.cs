@@ -237,28 +237,25 @@ public sealed class TtsCommands : ApplicationCommandModule<ApplicationCommandCon
             return;
         }
 
+        var voiceChannel = config.VoiceChannelId.HasValue ? $"<#{config.VoiceChannelId}>" : "Not set";
         var textChannel = config.TextChannelId.HasValue && config.TextChannelId.Value != 0
             ? $"<#{config.TextChannelId}>"
             : "Not set";
-        var voiceChannel = config.VoiceChannelId.HasValue ? $"<#{config.VoiceChannelId}>" : "Not set";
-        var connectedStatus = isConnected ? "Yes" : "No";
         var voiceIdDisplay = config.VoiceId ?? "Default";
         var providerDisplay = config.TtsProvider ?? "ElevenLabs";
+        var connectedStatus = isConnected ? "Yes" : "No";
+
+        var monitoringNote = _botConfig.EnableTextChannelMonitoring ? "" : " (monitoring disabled)";
 
         var response = $"**TTS Bot Status**\n" +
                        $"Mode: {mode}\n" +
-                       $"TTS Provider: {providerDisplay}\n" +
+                       $"TTS Provider: **{providerDisplay}**\n" +
                        $"Default Voice Channel: {voiceChannel}\n" +
+                       $"Text Channel: {textChannel}{monitoringNote}\n" +
                        $"Voice ID: `{voiceIdDisplay}`\n" +
                        $"Voice Connected: {connectedStatus}\n" +
-                       $"Queue Size: {queueCount}";
-
-        if (_botConfig.EnableTextChannelMonitoring)
-        {
-            response += $"\nText Channel Monitoring: {textChannel}";
-        }
-
-        response += $"\nLast Updated: {config.UpdatedAt:g}";
+                       $"Queue Size: {queueCount}\n" +
+                       $"Last Updated: {config.UpdatedAt:g}";
 
         await RespondEphemeralAsync(response);
     }

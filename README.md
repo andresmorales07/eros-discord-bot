@@ -288,10 +288,9 @@ All command responses are **ephemeral** (only visible to the user who ran the co
 | Command | Description | Permission | Visibility |
 |---------|-------------|------------|------------|
 | `/say <text> [voice-channel]` | Speak text in a voice channel | Everyone | Ephemeral |
-| `/tts-setup <voice-channel> [text-channel] [voice-id]` | Configure default voice channel and custom voice | Manage Guild | Ephemeral |
-| `/tts-provider <provider>` | Set TTS provider (ElevenLabs or OpenAI) | Manage Guild | Ephemeral |
+| `/tts-config [voice-channel] [text-channel] [voice-id] [provider]` | Configure TTS settings (at least one option required) | Manage Guild | Ephemeral |
 | `/tts-stop` | Disconnect from voice | Everyone | Ephemeral |
-| `/tts-status` | Show current configuration, mode, voice ID, and TTS provider | Everyone | Ephemeral |
+| `/tts-status` | Show current TTS configuration and status | Everyone | Ephemeral |
 | `/tts-clear` | Remove TTS configuration | Manage Guild | Ephemeral |
 
 ### NPC Commands
@@ -330,17 +329,11 @@ You can also specify a different voice channel:
 
 ### Custom Voice and Provider per Server
 
-Each Discord server can choose a TTS provider (ElevenLabs or OpenAI) and use a different voice.
+Each Discord server can choose a TTS provider (ElevenLabs or OpenAI) and use a different voice. Use `/tts-config` to configure all settings in one command:
 
-1. Set the TTS provider (defaults to ElevenLabs):
-   ```
-   /tts-provider provider:OpenAI
-   ```
-
-2. Configure a custom voice with `/tts-setup`:
-   ```
-   /tts-setup voice-channel:General voice-id:EXAVITQu4vr4xnSDxMaL
-   ```
+```
+/tts-config voice-channel:General provider:OpenAI voice-id:alloy
+```
 
 You can find voice IDs in:
 - [ElevenLabs Voice Library](https://elevenlabs.io/voice-library) for ElevenLabs voices
@@ -352,9 +345,9 @@ If no `voice-id` is specified, the default voice from your configuration is used
 
 The bot supports multiple named NPCs per guild, each with their own personality, voice, and conversation history — perfect for D&D sessions:
 
-1. Configure a default voice channel with `/tts-setup`:
+1. Configure a default voice channel with `/tts-config`:
    ```
-   /tts-setup voice-channel:General
+   /tts-config voice-channel:General
    ```
 
 2. Create NPCs with unique personalities and optional voice IDs:
@@ -395,9 +388,9 @@ If you want the bot to automatically read messages from a text channel (legacy b
 
 1. Set `EnableTextChannelMonitoring` to `true` in your configuration
 2. Enable the **Message Content Intent** in the Discord Developer Portal
-3. Use `/tts-setup` to configure channels:
+3. Use `/tts-config` to configure channels:
    ```
-   /tts-setup voice-channel:General text-channel:#tts-messages
+   /tts-config voice-channel:General text-channel:#tts-messages
    ```
 4. Messages sent in the configured text channel will be read aloud automatically
 
@@ -438,7 +431,7 @@ ErosTTS.Bot/
 - Ensure `EnableTextChannelMonitoring` is set to `true` in configuration
 - Ensure Message Content Intent is enabled in the Discord Developer Portal
 - Check that the bot has permission to read the text channel
-- Verify the channel is configured with `/tts-setup`
+- Verify the channel is configured with `/tts-config`
 
 ### No audio plays
 - Ensure FFmpeg is installed and accessible (or set `Voice:FFmpegPath` to the full path)
@@ -450,7 +443,7 @@ ErosTTS.Bot/
 - The bot implements exponential backoff for rate limits
 - Consider upgrading your TTS provider plan (Eleven Labs or OpenAI) for higher limits
 - Reduce message frequency in the monitored channel
-- Try switching to a different TTS provider using `/tts-provider`
+- Try switching to a different TTS provider using `/tts-config provider:OpenAI`
 
 ### Voice connection issues
 - The bot will automatically reconnect on disconnect
@@ -461,7 +454,7 @@ ErosTTS.Bot/
 ### NPC not responding
 - Ensure `OpenRouter:ApiKey` is configured
 - Ensure at least one NPC has been created with `/npc-create`
-- Check that a voice channel is configured with `/tts-setup`
+- Check that a voice channel is configured with `/tts-config`
 - Review logs for API errors (rate limits, authentication failures)
 - Verify your OpenRouter account has credits available
 
